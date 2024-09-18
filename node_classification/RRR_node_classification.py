@@ -23,7 +23,7 @@ from sys import argv
 ''' 
 ### What this script does: ###
 - Extracts a subgraph from a running neo4j graph database e.g. by filtering out some node- and relation-types.
-- Then we can step wise destroy the subgraph by randomly removing relations (e.g. 10%, 20%, ...90%), aka RRR-random relation removement.
+- Then we can step wise destroy the subgraph by randomly removing relations (e.g. [10%, 20%, ...90%]), aka RRR-random relation removement.
 - On each partly-randomly-destroyed subgraph we train different configured mindwalc classifiers and evaluate them with 10-fold cross validation.
 - There are some other scripts which can be used to evaluate the results of this script (e.g. plot_RRR_curves.py).
 
@@ -44,7 +44,6 @@ node_types_to_consider = ['ObjectConcept']  # allow all concept-types, containin
 subgraph_growing_size = 3
 min_hierarchical_depth = 0
 disconnect_similar_concepts = False  # Disconnect also those concepts which are a undercategory of a concept_to_disconnect
-use_connections_via_context = True
 
 ########### random relation removement params ###############
 relation_types_not_allowed_to_delete = [] #["BELONGS_TO_GROUP"]
@@ -67,15 +66,15 @@ fold_amount = 10
 
 # mindwalc params:
 # default is 8. (4 would mean: do not use background knowledge, 6=maximum +1 step into knowledge, 8=+2 steps into knowledge...)
-path_max_depths = [10, 10]
-path_min_depths = [2, 2]
+path_max_depths = [10, 10, 10, 10]
+path_min_depths = [2, 2, 2, 2]
 max_tree_depth = None  # default is None
 min_samples_leaf = 10  # default is 10
-use_forests = [False, False]
+use_forests = [False, False, False, False]
 n_estimators_list = [1, 1, 1, 1, 1, 1] # for RF
-fixed_walking_depths = [True, True]
-use_sklearn = [False, False]
-relation_tail_merging = [True, False]
+fixed_walking_depths = [True, True, False, False]
+use_sklearn = [False, False, False, False]
+relation_tail_merging = [False, True, False, True]
 
 ########## Pokemon labeling setup #####
 
@@ -420,7 +419,7 @@ def main():
                         src.render(result_path + f"/trees/example_tree{i_crossval}.gv", view=False)
 
                         tree_visualisation_postprocessor(result_path + f"/trees/example_tree{i_crossval}.gv", gdb_adress, auth,
-                                                         ["name"],
+                                                         ["name", "FSN"],
                                                          depth_offset=tree_vis_depth_offset, depth_factor=tree_vis_depth_factor,
                                                          node_labels_to_hide=node_types_to_consider)
 
@@ -440,7 +439,7 @@ def main():
 
                         tree.visualise(result_path + f"/trees/example_tree{i_crossval}.gv", False, as_pdf=False)
                         tree_visualisation_postprocessor(result_path + f"/trees/example_tree{i_crossval}.gv", gdb_adress, auth,
-                                                         ["name"], data_distribution_in_tree=data_distribution_in_tree,
+                                                         ["name", "FSN"], data_distribution_in_tree=data_distribution_in_tree,
                                                          depth_offset=tree_vis_depth_offset, depth_factor=tree_vis_depth_factor)
 
                         cross_val_results["node_count"].append(tree.node_count)

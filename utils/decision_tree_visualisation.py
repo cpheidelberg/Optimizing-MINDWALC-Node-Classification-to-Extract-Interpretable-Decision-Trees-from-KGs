@@ -5,6 +5,7 @@ import sys, os
 
 ########## params ###########
 neo4j_node_id_prefix = "neo4j://graph.individuals#"
+neo4j_schema_id_prefix = "neo4j://graph.schema#"
 neo4j_attribute_to_display_in_tree = ["name"]
 
 ######## coloring ##########
@@ -135,7 +136,8 @@ def tree_visualisation_postprocessor(in_gv_file_path, neo4j_url="neo4j://localho
                 node['label'] = node['label'].replace(neo4j_node_id_prefix + neo4j_node_id, node_name)
             if data_distribution:
                 node['label'] += f"<br/>[{data_distribution}]"
-
+        elif neo4j_schema_id_prefix in node["label"]: # is it a schema node?
+            node['label'] = node['label'].replace(neo4j_schema_id_prefix, "")
         else: # it is a leaf node:
             leaf_node_label = node['label'].replace('"', '')
             if leaf_node_label in list(fill_color_dict.keys()):

@@ -2,7 +2,7 @@ from tqdm import tqdm
 from neo4j import GraphDatabase
 from sys import argv
 from MINDWALC.neo4j2rdf import cypher_to_rdf
-import json
+import json, yaml
 
 
 # neo4j db of new neo4j dub for subgraph requirements:
@@ -19,23 +19,9 @@ import json
 # During this search, use the much faster test_run mode, which will still give you the correct lonely-center-nodes count
 # If you have the optimal max_path_length, set test_run to False and run the script again to get the final subgraph.
 
-
 # params:
-subgraph_generation_config = {
-    "center_node_identification_property": "sctid",
-    "center_node_identification_property_type": "string",
-    "label_center_nodes_with": "ProstateCenterNode", # can be None
-    "center_node_ids": ["369772003", "369773008", "369774002", "34081008", "29771007", "309200000", "75943001", "181422007", "30217000", "47690009", "361083003", "127906001", "66997005", "95355007", "255286006", "125380001", "13331008", "783152005", "89855005", "78236000", "74411000119100", "92308005", "125363000", "279708002", "50916005", "57597008", "50707001", "716766007", "803009", "61500009", "75594004", "399490008"],
-    "max_path_length": 5,
-    "path_search_relation_condition": "true", # define a query which cas, as example check sth like "r.active is not NULL"
-    "neighborhood_extraction_size": 0,
-    "search_for_directed_paths": False,
-    "subgraph_name": "prostate_subgraph",
-    "test_run": False, # test_run true is faster because it does only collect one smallest path for each start-target-node pair. But it does find less paths!
-    "export_rdf": True,
-    "export_as_neo4j_cypher_import_script": True,
-    "pase_label": "ObjectConcept" # nodes which do not have this label, will not be collected. (currently None not allowed)
-}
+config_file_path = "./data/subgraphs/prostate_subgraphs/prostate-snomed-subgraph-config-0.1.yaml"
+config_file_path = "./data/subgraphs/prostate_subgraphs/prostate-snomed-subgraph-config-1.0.yaml"
 
 if __name__ == '__main__':
 
@@ -49,11 +35,24 @@ if __name__ == '__main__':
     driver = GraphDatabase.driver(gdb_adress, auth=('neo4j', pw))
     session = driver.session(database="neo4j")
 
+    # load config file with yaml:
+    with open(config_file_path, 'r') as f:
+        subgraph_generation_config = yaml.safe_load(f)
+
     # handle center node ids:
-    center_node_ids = list(set(subgraph_generation_config["center_node_ids"]))
-    if len(center_node_ids) < len(subgraph_generation_config["center_node_ids"]):
-        print(f"WARNING: Some center nodes are duplicates and will be removed ("
-              f"{len(subgraph_generation_config['center_node_ids'])-len(center_node_ids)}).")
+    if subgraph_generation_config['center_node_label'] and subgraph_generation_config['center_node_ids']:
+        raise ValueError("Config error: Please provide either center_node_label or center_node_ids, not both.")
+    elif subgraph_generation_config['center_node_label']:
+        center_node_ids_query = f"MATCH (n:{subgraph_generation_config['center_node_label']}) return n.{subgraph_generation_config['center_node_identification_property']} as id"
+        center_node_ids = [r['id'] for r in session.run(center_node_ids_query)]
+    elif subgraph_generation_config['center_node_ids']:
+        center_node_ids = list(set(subgraph_generation_config["center_node_ids"]))
+        if len(center_node_ids) < len(subgraph_generation_config["center_node_ids"]):
+            print(f"WARNING: Some center nodes are duplicates and will be removed ("
+                  f"{len(subgraph_generation_config['center_node_ids']) - len(center_node_ids)}).")
+    else:
+        raise ValueError("Config error: Please provide either center_node_label or center_node_ids.")
+
 
     if subgraph_generation_config["test_run"]:
         subgraph_name = subgraph_generation_config["subgraph_name"] + f"_p{subgraph_generation_config['max_path_length']}" + "_TEST"
@@ -159,22 +158,22 @@ if __name__ == '__main__':
         print(f" -{k}:\t{stats[k]}")
     print()
 
-    # mark each selected node and relation with attribute "selected_path"=True:
-    print(f"selecting {len(selected_relations)} relations and {len(selected_nodes)} nodes...")
-    session.run("match (n) REMOVE n.selected_path") # clear previous selections
-    session.run("match (a)-[r]-(b) REMOVE r.selected_path") # clear previous selections
+    # mark each selected node and relation with attribute subgraph_name=True:
+    print(f"selecting {len(selected_relations)} relations and {len(selected_nodes)} nodes with .{subgraph_name}=True in neo4j db...")
+    session.run(f"match (n) REMOVE n.{subgraph_name}") # clear previous selections
+    session.run(f"match (a)-[r]-(b) REMOVE r.{subgraph_name}") # clear previous selections
     for node_id in tqdm(selected_nodes):
-        session.run(f"match (n) where ID(n) = {node_id} set n.selected_path = True")
+        session.run(f"match (n) where ID(n) = {node_id} set n.{subgraph_name} = True")
     for relation_id in tqdm(selected_relations):
-        session.run(f"match (a)-[r]-(b) where ID(r) = {relation_id} set r.selected_path = True")
+        session.run(f"match (a)-[r]-(b) where ID(r) = {relation_id} set r.{subgraph_name} = True")
 
-    print(f"Done. You can use the following query to get the selected nodes and relations: "
-      f"match (a)-[r]->(b) where a.selected_path and b.selected_path and r.selected_path return *")
+    print(f"Done. You can use the following query to get the selected nodes and relations:\n"
+      f"match (a)-[r]->(b) where a.{subgraph_name} and b.{subgraph_name} and r.{subgraph_name} return *\n")
 
     ############# 2. convert selected subgraph to rdf: #############
     if subgraph_generation_config["export_rdf"]:
         rdf_out_file = "./data/subgraphs/" + subgraph_name + '.n3'
-        cypher_to_rdf("match (a)-[r]->(b) where a.selected_path and b.selected_path and r.selected_path return *",
+        cypher_to_rdf(f"match (a)-[r]->(b) where a.{subgraph_name} and b.{subgraph_name} and r.{subgraph_name} return *",
                         rdf_out_file, 'localhost', ('neo4j', pw))
 
         print("saved selected subgraph as rdf file at " + rdf_out_file)
@@ -187,7 +186,7 @@ if __name__ == '__main__':
             json.dump(subgraph_generation_config, f, indent=4)
 
     if subgraph_generation_config["test_run"]:
-        print("\n=== WARNING ===\nThis was a test run to find good parameters. "
+        print("\n=== WARNING ===\nThis was a test run to find good parameters within short time. Not all possible paths are collected!"
               "\nFor the final run, set 'test_run' to False in the config.\n")
         exit()
 
@@ -195,11 +194,11 @@ if __name__ == '__main__':
     if not subgraph_generation_config["export_as_neo4j_cypher_import_script"]:
         exit()
 
-    #query = "CALL apoc.export.json.query('match (a)-[r]->(b) where a.selected_path and b.selected_path and r.selected_path return a, r, b', null, {stream:true})"
+    #query = "CALL apoc.export.json.query('match (a)-[r]->(b) where a.subgraph_name and b.subgraph_name and r.subgraph_name return a, r, b', null, {stream:true})"
     # file will be droped in /neo4j/db/home/import    the neo4j homedir can be found by clicking on "terminal" in the neo4j browser
     subgraph_neo4j_import_file = subgraph_name + "_import.cypher"
-    #query_json_export = f'CALL apoc.export.json.query("match (a)-[r]->(b) where a.selected_path and b.selected_path and r.selected_path return a, r, b", "{json_out_path}")'
-    query_cypher_export = ('MATCH (a)-[r]->(b) where a.selected_path and b.selected_path and r.selected_path '
+    #query_json_export = f'CALL apoc.export.json.query("match (a)-[r]->(b) where a.subgraph_name and b.subgraph_name and r.subgraph_name return a, r, b", "{json_out_path}")'
+    query_cypher_export = (f'MATCH (a)-[r]->(b) where a.{subgraph_name} and b.{subgraph_name} and r.{subgraph_name} '
                            'WITH collect(DISTINCT a) + collect(DISTINCT  b) AS importNodes, collect(r) AS importRels '
                            'CALL apoc.export.cypher.data(importNodes, importRels, '
                            f'"{subgraph_neo4j_import_file}", '
