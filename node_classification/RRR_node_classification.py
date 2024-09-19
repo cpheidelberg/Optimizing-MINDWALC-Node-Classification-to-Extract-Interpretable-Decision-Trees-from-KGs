@@ -37,13 +37,10 @@ NORMAL_VULNERABILITY_AGAINST_concepts = ["1989", "1990", "1991", "1992", "1993",
 fire_water_grass_concepts = ['263', '266', '274']
 all_poketype_node_ids = ['261', '262' ,'263', '264', '265', '266', '267', '268', '269',
                          '270', '271', '272', '273', '274', '275', '276', '277', '278']
-concepts_to_disconnect = fire_water_grass_concepts + NORMAL_VULNERABILITY_AGAINST_concepts
-relations_to_disconnect = ["HAS_TYPE", "AGAINST"]  # "FROM" connects pokemon with generation node
+concepts_to_disconnect = []#fire_water_grass_concepts + NORMAL_VULNERABILITY_AGAINST_concepts
+#relations_to_disconnect = ["HAS_TYPE", "AGAINST"]  # "FROM" connects pokemon with generation node
+relations_to_disconnect = ["CAN_MIMICK"]
 node_types_to_consider = ['ObjectConcept']  # allow all concept-types, containing also the exposed ModType concepts
-#allowed_concept_types = ['Generation', 'Ability', 'Move', 'TeamMember', 'Pokemon', 'ModType']
-subgraph_growing_size = 3
-min_hierarchical_depth = 0
-disconnect_similar_concepts = False  # Disconnect also those concepts which are a undercategory of a concept_to_disconnect
 
 ########### random relation removement params ###############
 relation_types_not_allowed_to_delete = [] #["BELONGS_TO_GROUP"]
@@ -62,7 +59,7 @@ store_all_trees = True
 overwrite_output_files = False
 n_jobs = 1
 post_prune = False
-fold_amount = 2
+fold_amount = 4
 
 # mindwalc params:
 # default is 8. (4 would mean: do not use background knowledge, 6=maximum +1 step into knowledge, 8=+2 steps into knowledge...)
@@ -72,7 +69,7 @@ max_tree_depth = None  # default is None
 min_samples_leaf = 2  # the minimum amount of available walks required to continue to build the DT. default is 10.
 use_forests = [False, False, False, False]
 forest_size = [1, 1, 1, 1, 1, 1] # for random forest (how many estimators/trees shall be used)
-fixed_walking_depths = [True, True, False, False]
+fixed_walking_depths = [False, False, True, True]
 use_sklearn = [False, False, False, False]
 relation_tail_merging = [False, True, False, True]
 
@@ -145,9 +142,23 @@ def main():
 
     for random_relation_removement in tqdm(random_relation_removements): #####for each random relation removement value
 
-        # todo: apply subgraph seletion:
-        session.run(f"match (n:{node_instance_type}) remove n.{subgraph_name}")
-        session.run(f"match (n:{node_instance_type}) set n.{subgraph_name} = true") # for now, select whole graph as subgraph
+        # reset last selection:
+        session.run(f"match (n) remove n.{subgraph_name}")
+        session.run(f"match ()-[r]-() remove r.{subgraph_name}")
+
+        for node_type_to_consider in node_types_to_consider:
+
+            # select whole graph:
+            session.run(f"match (n:{node_type_to_consider}) set n.{subgraph_name} = true") # for now, select whole graph as subgraph
+            session.run(f"match (:{node_type_to_consider})-[r]-(:{node_type_to_consider}) set r.{subgraph_name} = true") # for now, select whole graph as subgraph
+
+            # remove specific relation-types from selection:
+            for relation_type in relations_to_disconnect:
+                session.run(f"match (:{node_type_to_consider})-[r:{relation_type}]-(:{node_type_to_consider}) set r.{subgraph_name} = false")
+
+            # remove specific concepts from selection:
+            for concept_id in concepts_to_disconnect:
+                session.run(f"match (n:{node_type_to_consider}) where ID(n) = {concept_id} set n.{subgraph_name} = false")
 
         #create_report_subgraph(...)
         # remove random relations:

@@ -113,7 +113,8 @@ def tree_visualisation_postprocessor(in_gv_file_path, neo4j_url="neo4j://localho
 
             if depth is not None:
                 if type(depth) == list:
-                    depth = " - ".join([int((d + depth_offset)*depth_factor) for d in depth])
+                    depth_str = " - ".join([str(int((d + depth_offset)*depth_factor)) for d in depth])
+                    depth = depth_str
                 else:
                     depth = int((depth + depth_offset) * depth_factor)
                 node["label"] = node["label"].replace(f'{depth_prefix}{depth_string}', f'{depth_prefix}{depth}')
@@ -133,7 +134,7 @@ def tree_visualisation_postprocessor(in_gv_file_path, neo4j_url="neo4j://localho
             # Set new label:
             #node['label'] = f'{node_name}\n{node_neo4j_labels}{node_meta_info}' if node_name else node['label']
             if node_name:
-                node['label'] = node['label'].replace(neo4j_node_id_prefix + neo4j_node_id, node_name)
+                node['label'] = node['label'].replace(neo4j_node_id_prefix + neo4j_node_id, node_name).replace(neo4j_schema_id_prefix, "").replace("_MODIFIED_", " ")
             if data_distribution:
                 node['label'] += f"<br/>[{data_distribution}]"
         elif neo4j_schema_id_prefix in node["label"]: # is it a schema node?
