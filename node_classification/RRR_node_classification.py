@@ -30,7 +30,7 @@ from sys import argv
 '''
 
 #### subgraph  params: ###############
-node_instance_type = "ProstateCenterNode"#"PokeReport" #"ProstateCenterNode", #"Instance"
+node_instance_type = "ProstateInstance"#"PokeReport" #"ProstateCenterNode", #"Instance" # match (a) where NOT a.prostate_label IS NULL set a:ProstateInstance
 # exclude some concepts (nodes) and relations (we exclude some specific nodes/rels to make the clf-task harder):
 NORMAL_VULNERABILITY_AGAINST_concepts = ["1989", "1990", "1991", "1992", "1993", "1994", "1995", "1996", "1997", "1998",
                                          "1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006"]
@@ -56,22 +56,22 @@ rrr_start = 0.0
 tree_vis_depth_offset = 0#-2
 tree_vis_depth_factor = 1.0#0.5
 gv_file_prefix = 'neo4j://graph.individuals#'
-subgraph_name = "selected_path" #f'{node_instance_type.lower()}_subgraph' #todo: remove this temporary solution!!!
+subgraph_name = "prostate_subgraph_p3" #f'{node_instance_type.lower()}_subgraph'
 store_all_trees = True
 
 overwrite_output_files = False
 n_jobs = 1
 post_prune = False
-fold_amount = 10
+fold_amount = 2
 
 # mindwalc params:
 # default is 8. (4 would mean: do not use background knowledge, 6=maximum +1 step into knowledge, 8=+2 steps into knowledge...)
 path_max_depths = [10, 10, 10, 10]
-path_min_depths = [2, 2, 2, 2]
+path_min_depths = [0, 0, 0, 0]
 max_tree_depth = None  # default is None
-min_samples_leaf = 10  # default is 10
+min_samples_leaf = 2  # the minimum amount of available walks required to continue to build the DT. default is 10.
 use_forests = [False, False, False, False]
-n_estimators_list = [1, 1, 1, 1, 1, 1] # for RF
+forest_size = [1, 1, 1, 1, 1, 1] # for random forest (how many estimators/trees shall be used)
 fixed_walking_depths = [True, True, False, False]
 use_sklearn = [False, False, False, False]
 relation_tail_merging = [False, True, False, True]
@@ -80,9 +80,15 @@ relation_tail_merging = [False, True, False, True]
 
 # for gotta graph em all graph & joined:
 label_name_to_getter_query = {
+    'GP3 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "GP3 mimicker"',
+    'GP4 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "GP4 mimicker"',
+    'GP5 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "GP5 mimicker"',
+}
+
+'''label_name_to_getter_query = {
     'morph': f'match (n:{node_instance_type}) where n:MorphologicAbnormality ',
     'not_morph': f'match (n:{node_instance_type}) where not n:MorphologicAbnormality '
-}
+}'''
 
 '''label_name_to_getter_query = {
     'fire': f'match (n:{node_instance_type})-->(m:Context) where m.type2 is NULL and m.type1 = "fire"',
@@ -131,7 +137,7 @@ def main():
     print(f"random_relation_removements: {random_relation_removements}")
 
     result_path_root = create_new_result_folder_in('data/RRR_node_clf', overwrite_output_files,
-                                                   f'rrr_curve_{node_instance_type}_')
+                                                   f'rrr_curve_{subgraph_name}_')
 
     print(f"saving results to {result_path_root}")
 
@@ -212,7 +218,6 @@ def main():
         g = rdflib.Graph()
         g.parse(rdf_subgraph_file, format='text/n3')
         kg_non_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=False)
-
         kg_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=True)
 
         # create and clean training data: Remove each report which does not appear in our graph:
@@ -270,7 +275,7 @@ def main():
         for setting_id in range(len(path_max_depths)): #################### for each setting:
             path_max_depth = path_max_depths[setting_id]
             use_forest = use_forests[setting_id]
-            n_estimators = n_estimators_list[setting_id]
+            n_estimators = forest_size[setting_id]
             fixed_walking_depth = fixed_walking_depths[setting_id]
             path_min_depth = path_min_depths[setting_id]
             relation_tail_merge = relation_tail_merging[setting_id]

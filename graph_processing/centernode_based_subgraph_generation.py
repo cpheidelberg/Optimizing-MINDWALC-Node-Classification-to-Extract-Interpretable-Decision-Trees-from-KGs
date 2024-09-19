@@ -1,3 +1,5 @@
+import os.path
+
 from tqdm import tqdm
 from neo4j import GraphDatabase
 from sys import argv
@@ -20,8 +22,7 @@ import json, yaml
 # If you have the optimal max_path_length, set test_run to False and run the script again to get the final subgraph.
 
 # params:
-config_file_path = "./data/subgraphs/prostate_subgraphs/prostate-snomed-subgraph-config-0.1.yaml"
-config_file_path = "./data/subgraphs/prostate_subgraphs/prostate-snomed-subgraph-config-1.0.yaml"
+config_file_path = "./data/subgraphs/prostate_subgraphs/prostate-snomed-subgraph-config-1.2.yaml"
 
 if __name__ == '__main__':
 
@@ -91,7 +92,8 @@ if __name__ == '__main__':
         for j in range(i + 1, len(center_node_ids)):
             start_target_nodes.append((center_node_ids[i], center_node_ids[j]))
 
-    print(f"Collecting paths between {len(center_node_ids)} center nodes ({len(start_target_nodes)} possible combinations)...")
+    print(f"Collecting paths between {len(center_node_ids)} center nodes "
+          f"({len(start_target_nodes)} possible combinations)...", flush=True)
 
     # find paths between all start-target-node pairs:
     for center_node_id, target_node_id in tqdm(start_target_nodes):
@@ -172,18 +174,18 @@ if __name__ == '__main__':
 
     ############# 2. convert selected subgraph to rdf: #############
     if subgraph_generation_config["export_rdf"]:
-        rdf_out_file = "./data/subgraphs/" + subgraph_name + '.n3'
+        rdf_out_file =  os.path.join(os.path.dirname(config_file_path), subgraph_name + '.n3')
         cypher_to_rdf(f"match (a)-[r]->(b) where a.{subgraph_name} and b.{subgraph_name} and r.{subgraph_name} return *",
                         rdf_out_file, 'localhost', ('neo4j', pw))
-
         print("saved selected subgraph as rdf file at " + rdf_out_file)
 
         # save configuration as json:
-        json_out_path = "./data/subgraphs/" + subgraph_name + '.json'
+        json_out_path = os.path.join(os.path.dirname(config_file_path), subgraph_name + '.json')
         with open(json_out_path, 'w') as f:
             subgraph_generation_config["stats"] = stats
             subgraph_generation_config["node_connection_map"] = node_connection_map
             json.dump(subgraph_generation_config, f, indent=4)
+        print("saved configuration as json file at " + json_out_path)
 
     if subgraph_generation_config["test_run"]:
         print("\n=== WARNING ===\nThis was a test run to find good parameters within short time. Not all possible paths are collected!"
@@ -211,16 +213,16 @@ if __name__ == '__main__':
 
     print("next, lets convert the rdf file to a graph object and load it into an empty neo4j db.\n"
           "For this, please do the following: \n"
-          f" 1) Stop the currently running neo4j db."
-          f" 2) Create a new neo4j db (with same password as old db)."
-          f" 3) Install apoc into the new db."
-          f" 4) Set dbms.memory.heap.initial_size=4G and dbms.memory.heap.max_size=4G in the neo4j.conf file."
-          f" 5) Set apoc.import.file.enabled=true in the apoc.conf file."
-          f" 6) Copy '{subgraph_neo4j_import_file}' from old db to the import folder of the new db."
+          f" 1) Stop the currently running neo4j db.\n"
+          f" 2) Create a new neo4j db (with same password as old db).\n"
+          f" 3) Install apoc into the new db.\n"
+          f" 4) Set dbms.memory.heap.initial_size=4G and dbms.memory.heap.max_size=4G in the neo4j.conf file.\n"
+          f" 5) Set apoc.import.file.enabled=true in the apoc.conf file.\n"
+          f" 6) Copy '{subgraph_neo4j_import_file}' from old db to the import folder of the new db.\n"
           f" 7) Start the new neo4j db and wait until it runs."
           "\nIf all done, press enter to continue, or enter 'exit' to abort.")
-    input = input()
-    if input.lower() == "exit":
+    cmd = input()
+    if cmd.lower() == "exit":
         print("aborted.")
         exit()
 
@@ -233,16 +235,40 @@ if __name__ == '__main__':
     # check if db is empty:
     node_count = session.run("MATCH (n) return count(n)").single().value()
     while node_count > 0:
-        input("Neo4j database is not empty. Please empty the neo4j db and press enter to continue...")
+        cmd = input("Neo4j database is not empty. Can i erase the db? (y/n)")
+        if cmd.lower() == "y":
+            session.run("MATCH (n) DETACH DELETE n")
+        else:
+            print("aborted.")
+            session.close()
+            driver.close()
+            exit()
         node_count = session.run("MATCH (n) return count(n)").single().value()
-
 
     session.run("MATCH (n) DETACH DELETE n") # clear db
     query_cypher_import = f'CALL apoc.cypher.runFile("{subgraph_neo4j_import_file}")'
     try:
         results = session.run(query_cypher_import)
+
+        # check if there are duplications and if so, delete them:
+        ids = [r["id"] for r in session.run(f"match (a:{base_label}) return distinct a.{id_property} as id")]
+        unique_id_count = len(ids)
+        all_id_count = len([r for r in session.run(f"match (a:{base_label}) return a.{id_property}")])
+
+        if all_id_count > unique_id_count:
+            print(
+                f"WARNING: There are {all_id_count - unique_id_count} duplicated ids in the new neo4j db (might caused by nei4j bug?). Let me quickly clean this mess up...")
+            for id in tqdm(ids):
+                query = f"MATCH (a:{base_label}) where a.{id_property} = '{id}' RETURN ID(a) as id"
+                dublicated_ids = [r["id"] for r in session.run(query)]
+                if len(dublicated_ids) > 1:
+                    for i_d in range(1, len(dublicated_ids)):
+                        session.run(f"MATCH (a:{base_label}) where ID(a) = {dublicated_ids[i_d]} DETACH DELETE a")
+
+
+
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error during import: {e}")
     print("done.")
     print(f"if the import has failed, no worries. You can try again by running the following query in the neo4j browser of the new neo4j db:")
     print(query_cypher_import)

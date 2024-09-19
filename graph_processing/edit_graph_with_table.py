@@ -3,6 +3,7 @@ from neo4j import GraphDatabase
 import os, sys
 import pandas as pd
 from tqdm import tqdm
+import time
 
 '''
 ### what this script does ###
@@ -20,7 +21,10 @@ head_name_colum = 'Head'
 tail_name_colum = 'Tail'
 head_props_colum = 'Head-props'
 tail_props_colum = 'Tail-props'
-in_table_path = 'data/subgraphs/prostate_subgraphs/prostate-graph-1.0.xlsx'
+
+# 15 new nodes, 63 new relations (15 new relation-types)
+# need to add this to snomed graph: merge (a:ObjectConcept:QualifierValue {sctid: "1279783001", FSN: "Cribriform histologic pattern"})
+in_table_path = 'data/subgraphs/prostate_subgraphs/prostate-graph-1.2.xlsx'
 
 name_of_id_attribute = 'sctid'
 type_of_id_attribute = "string"
@@ -214,6 +218,27 @@ if __name__ == "__main__":
     driver = GraphDatabase.driver(gdb_adress, auth=auth)
     session = driver.session(database="neo4j")
 
+    # first check if there are some old modifications in the neo4j db:
+    query = f"MATCH (n) WHERE n.{modification_symbol} RETURN n"
+    node_count = len([r for r in session.run(query)])
+    query = f"MATCH ()-[r]-() WHERE r.{modification_symbol} RETURN r"
+    relation_count = len([r for r in session.run(query)])
+
+    if node_count > 0 or relation_count > 0:
+        print(
+            f"==> WARNING: There are already {node_count} nodes and {relation_count} relations with the modification symbol '{modification_symbol}' in the neo4j db.")
+        print("==> Do you want to delete the old modifications before commiting the new ones? "
+              "\n(each modification will be applied with MERGE, not CREATE, so duplications will be avoided)",
+              flush=True)
+        cmd = input("(y/n): ").lower()
+        if cmd == "y":
+            for q in clearing_queries:
+                session.run(q)
+            time.sleep(1)
+            print("Old modifications deleted.")
+        else:
+            print("Old modifications not deleted.")
+
     # read in table:
     table = pd.read_excel(in_table_path)
 
@@ -260,24 +285,7 @@ if __name__ == "__main__":
     cmd = input("(y/n): ").lower()
     if cmd == "y":
 
-        # first check if there are some old modifications in the neo4j db:
-        query = f"MATCH (n) WHERE n.{modification_symbol} RETURN n"
-        node_count = len([r for r in session.run(query)])
-        query = f"MATCH ()-[r]-() WHERE r.{modification_symbol} RETURN r"
-        relation_count = len([r for r in session.run(query)])
-
-        if node_count > 0 or relation_count > 0:
-            print(f"==> WARNING: There are already {node_count} nodes and {relation_count} relations with the modification symbol '{modification_symbol}' in the neo4j db.")
-            print("==> Do you want to delete the old modifications before commiting the new ones? "
-                  "\n(each modification will be applied with MERGE, not CREATE, so duplications will be avoided)", flush=True)
-            cmd = input("(y/n): ").lower()
-            if cmd != "y":
-                session.run(f"MATCH (h)-[r]->(t) where r.{modification_symbol} delete r")
-                session.run(f"MATCH (n) where n.{modification_symbol} delete n")
-                print("Old modifications deleted.")
-            else:
-                print("Old modifications not deleted.")
-
+        print("Commiting changes to neo4j db...", flush=True)
         for i, row in tqdm(table.iterrows(), total=len(table)):
             mod_query = row["cypher-query"]
             if mod_query and type(mod_query) == str:
@@ -288,13 +296,15 @@ if __name__ == "__main__":
                             session.run(q)
                 else:
                     session.run(mod_query)
-
-        print("==> Done. Commited changes to neo4j.")
-        query = f"MATCH (n) WHERE n.{modification_symbol} RETURN n"
+        time.sleep(1)
+        print("==> Done.")
+        query = f"match (a) where a.{modification_symbol} return distinct a.FSN"
         node_count = len([r for r in session.run(query)])
-        query = f"MATCH ()-[r]-() WHERE r.{modification_symbol} RETURN r"
+        query = f"match (a)-[r]-(b) where r.{modification_symbol} return distinct ID(r)"
         relation_count = len([r for r in session.run(query)])
-        print(f"Added {node_count} new nodes and {relation_count} new relations with the modification symbol '{modification_symbol}' to the neo4j db.")
+        query = f"match (a)-[r]-(b) where r.{modification_symbol} return distinct type(r)"
+        relationtype_count = len([r for r in session.run(query)])
+        print(f"Added {node_count} new nodes, {relation_count} new relations ({relationtype_count} new relation-types) with the modification symbol '{modification_symbol}' to the neo4j db.")
         print(f"\nTipp:\nTo undo the commited changes, run the following cypher queries:\n"
               f"MATCH (h)-[r]->(t) where r.{modification_symbol} delete r\n"
               f"MATCH (n) where n.{modification_symbol} delete n")
