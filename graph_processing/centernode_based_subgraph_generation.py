@@ -226,8 +226,6 @@ if __name__ == '__main__':
         print("aborted.")
         exit()
 
-    print("importing. This may take a while...")
-
     # reconnect to new neo4j db:
     driver = GraphDatabase.driver(gdb_adress, auth=('neo4j', pw))
     session = driver.session(database="neo4j")
@@ -238,14 +236,14 @@ if __name__ == '__main__':
         cmd = input("Neo4j database is not empty. Can i erase the db? (y/n)")
         if cmd.lower() == "y":
             session.run("MATCH (n) DETACH DELETE n")
-        else:
+        elif cmd.lower() == "n":
             print("aborted.")
             session.close()
             driver.close()
             exit()
         node_count = session.run("MATCH (n) return count(n)").single().value()
 
-    session.run("MATCH (n) DETACH DELETE n") # clear db
+    print("\nimporting usind apoc.cypher.runFile(). This may take a while...")
     query_cypher_import = f'CALL apoc.cypher.runFile("{subgraph_neo4j_import_file}")'
     try:
         results = session.run(query_cypher_import)
@@ -264,8 +262,6 @@ if __name__ == '__main__':
                 if len(dublicated_ids) > 1:
                     for i_d in range(1, len(dublicated_ids)):
                         session.run(f"MATCH (a:{base_label}) where ID(a) = {dublicated_ids[i_d]} DETACH DELETE a")
-
-
 
     except Exception as e:
         print(f"Error during import: {e}")

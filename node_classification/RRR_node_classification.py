@@ -22,11 +22,11 @@ from sys import argv
 
 ''' 
 ### What this script does: ###
-- Extracts a subgraph from a running neo4j graph database e.g. by filtering out some node- and relation-types.
-- Then we can step wise destroy the subgraph by randomly removing relations (e.g. [10%, 20%, ...90%]), aka RRR-random relation removement.
-- On each partly-randomly-destroyed subgraph we train different configured mindwalc classifiers and evaluate them with 10-fold cross validation.
-- There are some other scripts which can be used to evaluate the results of this script (e.g. plot_RRR_curves.py).
-
+- Selects a subgraph from a running neo4j graph database e.g. by filtering out some node- and relation-types.
+- Then we can step wise destroy the "Instance knowledge" by randomly removing the relations between instance-nodes and its neighbors. 
+- We call this process Random Relation Removement (RRR) and we apply it step wise to destroy more and more percentage (e.g. [0%, 10%, 20%, ...90%]).
+- On each RRR-level, we train different configured mindwalc classifiers and evaluate them with k-fold cross validation.
+- There are some other scripts which can be used to generate tables and plots from the results (e.g. plot_RRR_curves.py).
 '''
 
 #### subgraph  params: ###############
@@ -39,14 +39,15 @@ all_poketype_node_ids = ['261', '262' ,'263', '264', '265', '266', '267', '268',
                          '270', '271', '272', '273', '274', '275', '276', '277', '278']
 concepts_to_disconnect = []#fire_water_grass_concepts + NORMAL_VULNERABILITY_AGAINST_concepts
 #relations_to_disconnect = ["HAS_TYPE", "AGAINST"]  # "FROM" connects pokemon with generation node
-relations_to_disconnect = ["CAN_MIMICK"]
+relations_to_disconnect = []#["CAN_MIMICK"]
 node_types_to_consider = ['ObjectConcept']  # allow all concept-types, containing also the exposed ModType concepts
 
 ########### random relation removement params ###############
 relation_types_not_allowed_to_delete = [] #["BELONGS_TO_GROUP"]
 rrr_step_size = 0.1
-rrr_max = 0.0  # 0.9 0.1
+rrr_max = 0.9  # 0.9 0.1
 rrr_start = 0.0
+steps = 10
 
 ########### tree params ###############
 # for decision tree visualization:
@@ -59,7 +60,7 @@ store_all_trees = True
 overwrite_output_files = False
 n_jobs = 1
 post_prune = False
-fold_amount = 4
+fold_amount = 10
 
 # mindwalc params:
 # default is 8. (4 would mean: do not use background knowledge, 6=maximum +1 step into knowledge, 8=+2 steps into knowledge...)
@@ -77,10 +78,17 @@ relation_tail_merging = [False, True, False, True]
 
 # for gotta graph em all graph & joined:
 label_name_to_getter_query = {
+    'adenocarcinoma (GP3-5)': f'match (n:{node_instance_type}) where n.prostate_label = "adenocarcinoma"',
+    'GP3 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "pattern 3 mimicker case"',
+    'GP4 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "pattern 4 mimicker case"',
+    'GP5 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "pattern 5 mimicker case"',
+}
+
+'''label_name_to_getter_query = {
     'GP3 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "GP3 mimicker"',
     'GP4 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "GP4 mimicker"',
     'GP5 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "GP5 mimicker"',
-}
+}'''
 
 '''label_name_to_getter_query = {
     'morph': f'match (n:{node_instance_type}) where n:MorphologicAbnormality ',
@@ -129,7 +137,7 @@ def main():
     driver = GraphDatabase.driver(gdb_adress, auth=auth)
     session = driver.session(database="neo4j")
 
-    random_relation_removements = [round(x, 2) for x in np.linspace(rrr_start, rrr_max, int(rrr_start / rrr_step_size) + 1)]
+    random_relation_removements = [round(x, 2) for x in np.linspace(rrr_start, rrr_max, steps)]
 
     print(f"random_relation_removements: {random_relation_removements}")
 
@@ -152,6 +160,9 @@ def main():
             session.run(f"match (n:{node_type_to_consider}) set n.{subgraph_name} = true") # for now, select whole graph as subgraph
             session.run(f"match (:{node_type_to_consider})-[r]-(:{node_type_to_consider}) set r.{subgraph_name} = true") # for now, select whole graph as subgraph
 
+            # select the instances and the instance knowledge:
+            session.run(f"match (n:{node_instance_type})-[r]-(t:{node_type_to_consider}) set n.{subgraph_name} = true, t.{subgraph_name} = true, r.{subgraph_name} = true")
+
             # remove specific relation-types from selection:
             for relation_type in relations_to_disconnect:
                 session.run(f"match (:{node_type_to_consider})-[r:{relation_type}]-(:{node_type_to_consider}) set r.{subgraph_name} = false")
@@ -163,18 +174,27 @@ def main():
         #create_report_subgraph(...)
         # remove random relations:
         if random_relation_removement > 0.0:
-            for node_type_to_consider in node_types_to_consider:
-                q = (
-                    f'match (a:{node_instance_type})-[r]->(b:{node_type_to_consider}) where rand() < {random_relation_removement} '
-                    f'AND a.{subgraph_name} and b.{subgraph_name} and r.{subgraph_name} '
-                    f'AND NOT type(r) in {relation_types_not_allowed_to_delete}'
-                    f'remove r.{subgraph_name}')
-                session.run(q)
+
+            relations_to_delete = []
+            q = (f"match (a:{node_instance_type})-[r]->(b) where "
+                 f"a.{subgraph_name} and r.{subgraph_name} and b.{subgraph_name} "
+                 f"return id(a), id(r)")
+            relations_of_instances = {}
+            for id_a, id_r in [(r["id(a)"], r["id(r)"]) for r in session.run(q)]:  # for each node instance:
+                if id_a not in relations_of_instances.keys():
+                    relations_of_instances[id_a] = set()
+                relations_of_instances[id_a].add(id_r)
+            for id_a in relations_of_instances.keys():
+                relations = list(relations_of_instances[id_a])
+                np.random.shuffle(relations)
+                # now remove random_relation_removement from relations list:
+                relations_to_delete += relations[:int(len(relations) * random_relation_removement)]
+            session.run(f"match ()-[r]-() where ID(r) in {relations_to_delete} remove r.{subgraph_name}")
 
             # now check if the applied relation removements did produce lonely instance-nodes:
             removed_report_nodes = 0
             q = f"match (a:{node_instance_type}) where a.{subgraph_name} return id(a) as id"
-            for id in [r["id"] in session.run(q)]: # for each node instance:
+            for id in [r["id"] for r in session.run(q)]: # for each node instance:
                 q = (f"match (a)-[r]-(b) where id(a) = {id} and r.{subgraph_name} and b.{subgraph_name} "
                      f"and not (b:{node_instance_type}) return id(b) as id")
                 amount_neighbors = len([i for i in session.run(q)])
@@ -183,7 +203,8 @@ def main():
                     session.run(f"match (a) where id(a) = {id} remove a.{subgraph_name}")
                     removed_report_nodes += 1
 
-            print(f"removed {removed_report_nodes} featureless report nodes from subgraph {subgraph_name}.")
+            print(f"removed {removed_report_nodes} featureless report nodes from subgraph {subgraph_name} "
+                  f"after removing {round(random_relation_removement*100,1)}% relations.")
 
         # adding subgraph size to subgraph metha:
         r = session.run(f"match (c) where c.{subgraph_name} return count(c) as amount")
@@ -266,7 +287,7 @@ def main():
         meta_info = "==== Train Dataset Info ===\n\n"
         meta_info += f"Subgraph: {subgraph_name}\n"
         meta_info += f'\nFound {len(train_data["node_id"])} nodes to classify which ' \
-                     f'contain {len(list(labels_set))} different labels:\n'
+                     f'contain {len(list(labels_set))} different classes:\n'
         for i, label in enumerate(alphabet_labels):
             meta_info += f'{i})\t{len(label_to_node_list[label])}\tx\t{label}\n'
         meta_info += "\n"
@@ -487,6 +508,8 @@ def main():
 
             mean_values[tree_config_string]["node_count"].append(len(kg.vertices))
             mean_values[tree_config_string]["relation_count"].append(sum([len(x) for x in kg.transition_matrix.values()]))
+
+            print(f"f1: {mean_values[tree_config_string]['f1_mean'][-1]} +- {mean_values[tree_config_string]['f1_std'][-1]}")
 
             # save data as excel table:
             df = pd.DataFrame(cross_val_results)

@@ -1,4 +1,3 @@
-from PyQt5.QtCore import flush
 from neo4j import GraphDatabase
 import os, sys
 import pandas as pd
@@ -22,9 +21,13 @@ tail_name_colum = 'Tail'
 head_props_colum = 'Head-props'
 tail_props_colum = 'Tail-props'
 
+# if set to false, only the required cypher queries will be logged and printed. But not commited to the neo4j db.
+# The cypher querie log can be controlled in the stored log table. If everithink looks good, you can commit the changes.
+instant_commit = True
+
 # 15 new nodes, 63 new relations (15 new relation-types)
 # need to add this to snomed graph: merge (a:ObjectConcept:QualifierValue {sctid: "1279783001", FSN: "Cribriform histologic pattern"})
-in_table_path = 'data/subgraphs/prostate_subgraphs/prostate-graph-1.2.xlsx'
+in_table_path = 'data/subgraphs/prostate_subgraphs/prostate-graph-1.3.xlsx'
 
 name_of_id_attribute = 'sctid'
 type_of_id_attribute = "string"
@@ -76,9 +79,33 @@ def merge_HRT_triblet_into_neo4jDB(head_id, relation_name, tail_id, session,
     head_props = "" if type(head_props)!=str else head_props
     tail_props = "" if type(tail_props)!=str else tail_props
 
-    if head_id is None and tail_id is None:
-        log += "Head and Tail are None. Skipping."
-        return "", log
+    if not head_id and not tail_id:
+        # try to find the head and tail nodes by their names:
+        if type(head_name)==str:
+            query = f"MATCH (n:{node_type}) WHERE n.{name_of_id_attribute}='{head_name}' RETURN n.{name_of_id_attribute} AS id"
+            results = [r["id"] for r in session.run(query)]
+            if len(results) > 1:
+                raise Exception(f"WARNING: Found more than one node with n.{name_of_id_attribute}='{head_name}'. "
+                                f"This id should be unique. Please fix this!")
+            elif len(results) == 1:
+                head_id = results[0]
+            else:
+                head_id = None
+
+        if type(tail_name)==str:
+            query = f"MATCH (n:{node_type}) WHERE n.{name_of_id_attribute}='{tail_name}' RETURN n.{name_of_id_attribute} AS id"
+            results = [r["id"] for r in session.run(query)]
+            if len(results) > 1:
+                raise Exception(f"WARNING: Found more than one node with n.{name_of_id_attribute}='{tail_name}'. "
+                                f"This id should be unique. Please fix this!")
+            elif len(results) == 1:
+                tail_id = results[0]
+            else:
+                tail_id = None
+
+        if not head_id and not tail_id:
+            log += "Could not find Head_id or Tail_id. Skipping."
+            return "", log
 
     if type(relation_name) != str:
         log += "WARNING: Relation-name is None.\n"
@@ -137,7 +164,7 @@ def merge_HRT_triblet_into_neo4jDB(head_id, relation_name, tail_id, session,
 
         mod_query += f"MERGE (n:{node_type} " + "{" + f"{name_of_id_attribute}: '{new_node_id}', {name_of_name_attribute}: '{new_node_name}', {modification_symbol}: True" + "});\n"
         log += f"Added new node n with n.{name_of_id_attribute}='{new_node_id}' and n.{name_of_name_attribute}='{new_node_name}'.\n"
-    else: # both are not None:
+    else: # both ids are given:
         new_node_id = None
         # check if head and tail exists in neo4j graph:
         for node in [head_id, tail_id]:
@@ -203,6 +230,23 @@ def merge_HRT_triblet_into_neo4jDB(head_id, relation_name, tail_id, session,
 
     return mod_query, log
 
+def commit_cypher_query_list_to_neo4jDB(mod_query: str, session):
+    '''
+    Commits a list of cypher queries to the neo4j db.
+    :param query_list: A list of cypher queries, given as string, seperated with ; symbol
+    :param session: A neo4j session object.
+    :return: None
+    '''
+
+    if mod_query and type(mod_query) == str:
+        if ";" in mod_query:  # multiple queries?
+            mod_query = mod_query.split(";")
+            for q in [m.replace("\n", "") for m in mod_query]:
+                if q and type(q) == str:
+                    session.run(q)
+        else:
+            session.run(mod_query)
+
 if __name__ == "__main__":
 
     if type_of_id_attribute != "string":
@@ -219,11 +263,10 @@ if __name__ == "__main__":
     session = driver.session(database="neo4j")
 
     # first check if there are some old modifications in the neo4j db:
-    query = f"MATCH (n) WHERE n.{modification_symbol} RETURN n"
+    query = f"match (a) where a.{modification_symbol} return distinct a.FSN"
     node_count = len([r for r in session.run(query)])
-    query = f"MATCH ()-[r]-() WHERE r.{modification_symbol} RETURN r"
+    query = f"match (a)-[r]-(b) where r.{modification_symbol} return distinct ID(r)"
     relation_count = len([r for r in session.run(query)])
-
     if node_count > 0 or relation_count > 0:
         print(
             f"==> WARNING: There are already {node_count} nodes and {relation_count} relations with the modification symbol '{modification_symbol}' in the neo4j db.")
@@ -247,10 +290,10 @@ if __name__ == "__main__":
 
     # add nodes and relations to neo4j:
     for i, row in table.iterrows():
-        print(f"{i})")
-        head = node_id_post_processor(row[head_id_colum])
+        print(f"{i+2})")
+        head_id = node_id_post_processor(row[head_id_colum])
         relation = row[relation_id_colum]
-        tail = node_id_post_processor(row[tail_id_colum])
+        tail_id = node_id_post_processor(row[tail_id_colum])
 
         head_name = row[head_name_colum]
         tail_name = row[tail_name_colum]
@@ -258,6 +301,18 @@ if __name__ == "__main__":
         head_props = row[head_props_colum]
         tail_props = row[tail_props_colum]
 
+        # if the row is empty, continue
+        if pd.isna(head_id) and pd.isna(relation) and pd.isna(tail_id) and pd.isna(head_name) and pd.isna(tail_name):
+            print("Empty row. Skipping.")
+            continue
+
+        # head and tail name postprocessing:
+        if type(head_name) == str:
+            head_name = head_name.lower()
+        if type(tail_name) == str:
+            tail_name = tail_name.lower()
+
+        # relation-string postprocessing
         if type(relation) == str:
             relation = relation.upper()
             replacements = [(" ", "_"), ("-", "_"), ("/", "_OR_"), (",", "_")]
@@ -268,10 +323,13 @@ if __name__ == "__main__":
             while relation[0] == "_":
                 relation = relation[1:]
 
-        mod_query, log = merge_HRT_triblet_into_neo4jDB(head, relation, tail, session,
+        mod_query, log = merge_HRT_triblet_into_neo4jDB(head_id, relation, tail_id, session,
                                                         head_name=head_name, tail_name=tail_name,
                                                         head_props=head_props, tail_props=tail_props,
-                                                        modification_symbol=modification_symbol,)
+                                                        modification_symbol=modification_symbol)
+
+        if instant_commit:
+            commit_cypher_query_list_to_neo4jDB(mod_query, session)
 
         table.at[i, "cypher-query"] = mod_query
         table.at[i, "log"] = log
@@ -281,35 +339,33 @@ if __name__ == "__main__":
     table.to_excel(in_table_path.replace(".xlsx", "_log.xlsx"), index=False)
     print(f"==> Done.\nSaved logs into {in_table_path.replace('.xlsx', '_log.xlsx')}.")
 
-    print("Commit changes to connected neo4j db?", flush=True)
-    cmd = input("(y/n): ").lower()
-    if cmd == "y":
+    if not instant_commit:
+        print("Commit changes to connected neo4j db?", flush=True)
+        cmd = input("(y/n): ").lower()
+        if cmd == "y":
 
-        print("Commiting changes to neo4j db...", flush=True)
-        for i, row in tqdm(table.iterrows(), total=len(table)):
-            mod_query = row["cypher-query"]
-            if mod_query and type(mod_query) == str:
-                if ";" in mod_query: # multiple queries?
-                    mod_query = mod_query.split(";")
-                    for q in [m.replace("\n", "") for m in mod_query]:
-                        if q and type(q) == str:
-                            session.run(q)
-                else:
-                    session.run(mod_query)
-        time.sleep(1)
-        print("==> Done.")
-        query = f"match (a) where a.{modification_symbol} return distinct a.FSN"
-        node_count = len([r for r in session.run(query)])
-        query = f"match (a)-[r]-(b) where r.{modification_symbol} return distinct ID(r)"
-        relation_count = len([r for r in session.run(query)])
-        query = f"match (a)-[r]-(b) where r.{modification_symbol} return distinct type(r)"
-        relationtype_count = len([r for r in session.run(query)])
-        print(f"Added {node_count} new nodes, {relation_count} new relations ({relationtype_count} new relation-types) with the modification symbol '{modification_symbol}' to the neo4j db.")
-        print(f"\nTipp:\nTo undo the commited changes, run the following cypher queries:\n"
-              f"MATCH (h)-[r]->(t) where r.{modification_symbol} delete r\n"
-              f"MATCH (n) where n.{modification_symbol} delete n")
-    else:
-        print("==> Done. Changes not commited to neo4j.")
+            print("Commiting changes to neo4j db...", flush=True)
+            for i, row in tqdm(table.iterrows(), total=len(table)):
+                mod_query = row["cypher-query"]
+                commit_cypher_query_list_to_neo4jDB(mod_query, session)
+
+            time.sleep(1)
+            print("==> Done.")
+        else:
+            print("==> Done. Changes not commited to neo4j.")
+
+    query = f"match (a) where a.{modification_symbol} return distinct a.FSN"
+    node_count = len([r for r in session.run(query)])
+    query = f"match (a)-[r]-(b) where r.{modification_symbol} return distinct ID(r)"
+    relation_count = len([r for r in session.run(query)])
+    query = f"match (a)-[r]-(b) where r.{modification_symbol} return distinct type(r)"
+    relationtype_count = len([r for r in session.run(query)])
+    print(f"\nNow there are {node_count} custom nodes, \n"
+          f"{relation_count} custom relations ({relationtype_count} custom relation-types)\n"
+          f"with the modification symbol '{modification_symbol}' in the neo4j db.")
+    print(f"\nTipp:\nTo undo the commited changes, run the following cypher queries:\n"
+          f"MATCH (h)-[r]->(t) where r.{modification_symbol} delete r\n"
+          f"MATCH (n) where n.{modification_symbol} delete n")
 
     # close connection:
     session.close()
