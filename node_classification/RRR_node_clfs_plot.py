@@ -6,7 +6,7 @@ import numpy as np
 
 def main():
     axis_label_font_size = 12
-    dataset_num = "0"
+    dataset_num = "3"
     classified_nodes = "prostate_subgraph_p3"  # Current oprions: PokeReport, MergedPokemon, HierarchicalPokemon
     dataset_path = f"./data/RRR_node_clf/rrr_curve_{classified_nodes}_{dataset_num}"
     colors = ['g', 'b', 'r', 'c', 'm', 'y', 'k']

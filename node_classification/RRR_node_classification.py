@@ -44,10 +44,9 @@ node_types_to_consider = ['ObjectConcept']  # allow all concept-types, containin
 
 ########### random relation removement params ###############
 relation_types_not_allowed_to_delete = [] #["BELONGS_TO_GROUP"]
-rrr_step_size = 0.1
 rrr_max = 0.9  # 0.9 0.1
 rrr_start = 0.0
-steps = 10
+step_count = 10
 
 ########### tree params ###############
 # for decision tree visualization:
@@ -64,15 +63,15 @@ fold_amount = 10
 
 # mindwalc params:
 # default is 8. (4 would mean: do not use background knowledge, 6=maximum +1 step into knowledge, 8=+2 steps into knowledge...)
-path_max_depths = [10, 10, 10, 10]
-path_min_depths = [0, 0, 0, 0]
+path_max_depths = [10, 10, 10, 10, 10, 10]
+path_min_depths = [0, 0, 0, 0, 0, 0]
 max_tree_depth = None  # default is None
-min_samples_leaf = 2  # the minimum amount of available walks required to continue to build the DT. default is 10.
-use_forests = [False, False, False, False]
-forest_size = [1, 1, 1, 1, 1, 1] # for random forest (how many estimators/trees shall be used)
-fixed_walking_depths = [False, False, True, True]
-use_sklearn = [False, False, False, False]
-relation_tail_merging = [False, True, False, True]
+min_samples_leaf = 10  # the minimum amount of available walks required to continue to build the DT. default is 10.
+use_forests = [False, False, False, False, False, False]
+forest_size = [1, 1, 1, 1, 1, 1, 1, 1] # for random forest (how many estimators/trees shall be used)
+fixed_walking_depths = [True, True, False, False, None, None]
+use_sklearn = [False, False, False, False, False, False]
+relation_tail_merging = [False, True, False, True, False, True]
 
 ########## Pokemon labeling setup #####
 
@@ -137,7 +136,7 @@ def main():
     driver = GraphDatabase.driver(gdb_adress, auth=auth)
     session = driver.session(database="neo4j")
 
-    random_relation_removements = [round(x, 2) for x in np.linspace(rrr_start, rrr_max, steps)]
+    random_relation_removements = [round(x, 2) for x in np.linspace(rrr_start, rrr_max, step_count)]
 
     print(f"random_relation_removements: {random_relation_removements}")
 
@@ -212,7 +211,7 @@ def main():
         if subgraph_node_size == 0:
             warn(f"Subgraph {subgraph_name} has node-size 0!")
         session.run(
-            f"match (n:SubgraphMetha) where n.subgraph_name = '{subgraph_name}' set n.subgraph_node_size = {subgraph_node_size}")
+            f"match (n:{subgraph_name}) where n.subgraph_name = '{subgraph_name}' set n.subgraph_node_size = {subgraph_node_size}")
 
         ########### load and assemble train data from graph database ############
         train_data = {'node_id': [], 'label': []}

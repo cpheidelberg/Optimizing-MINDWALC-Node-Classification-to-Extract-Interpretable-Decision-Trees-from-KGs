@@ -15,7 +15,7 @@ import numpy as np
 # Table params:
 feature_id_colum = 'Features'
 label_id_colum = 'Case-diagnosis'
-in_table_path = 'data/subgraphs/prostate_subgraphs/SyntheticInstanceGeneration1.0.xlsx'
+in_table_path = 'data/subgraphs/prostate_subgraphs/SyntheticInstanceGeneration1.1.xlsx'
 
 # graph params:
 name_of_id_attribute = 'sctid'
@@ -26,7 +26,7 @@ interweave_relation = "RECOGNIZED_PATTERN"
 name_of_label_node_attribute = "prostate_label"
 
 # Instance generation params:
-number_of_instances_per_class = 111
+number_of_instances_per_class = 111#111
 feature_weaving_probability = 1.0
 
 clearing_queries = [
@@ -78,9 +78,9 @@ if __name__ == "__main__":
     print()
 
     # check if there are any instances in the dbms:
-    instances = session.run(f"MATCH (n:{node_instance_type}) RETURN ID(n)")
-    if len([r for r in instances]) > 0:
-        print(f"Found {len([r for r in instances])} instances in the database.")
+    instances = [r for r in session.run(f"MATCH (n:{node_instance_type}) RETURN ID(n)")]
+    if len(instances) > 0:
+        print(f"Found {len(instances)} instances in the database.")
         cmd = input("Do you want to delete all instances? (y/n): ")
         if cmd == "y":
             print("Deleting all instances...")
@@ -97,7 +97,7 @@ if __name__ == "__main__":
         feature_list = label_to_feature_list[class_label]
 
         # generate instances:
-        for i in range(number_of_instances_per_class):
+        for i in tqdm(r_i for r_i in range(number_of_instances_per_class)):
             # generate a random instance:
             instance_id = f"case_{i_class}-{i}"
             instance_features = []
@@ -113,16 +113,25 @@ if __name__ == "__main__":
             # connect the instance node with the features:
             for f in instance_features:
 
+                if '|' in f:
+                    node_id = f.split('|')[0]
+                    while node_id[-1] == ' ':
+                        node_id = node_id[:-1]
+                    while node_id[0] == ' ':
+                        node_id = node_id[1:]
+                else:
+                    node_id = f
+
                 # check if feature node f is present in the graph:
-                check_query = (f"MATCH (f:{node_type}) WHERE f.{name_of_id_attribute} = '{f}' "
+                check_query = (f"MATCH (f:{node_type}) WHERE f.{name_of_id_attribute} = '{node_id}' "
                                f"RETURN ID(f)")
                 result = session.run(check_query)
                 if len([r for r in result]) == 0:
-                    not_available_features.append(f)
+                    not_available_features.append(node_id)
                     continue
 
                 connect_feature_query = (f"MATCH (i:{node_instance_type}) WHERE  i.name = '{instance_id}' "
-                                         f"MATCH (f:{node_type}) WHERE f.{name_of_id_attribute} = '{f}' "
+                                         f"MATCH (f:{node_type}) WHERE f.{name_of_id_attribute} = '{node_id}' "
                                          f"MERGE (i)-[:{interweave_relation}]->(f)")
                 session.run(connect_feature_query)
 

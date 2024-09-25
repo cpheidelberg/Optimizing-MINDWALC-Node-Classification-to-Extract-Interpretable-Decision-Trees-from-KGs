@@ -22,7 +22,7 @@ import json, yaml
 # If you have the optimal max_path_length, set test_run to False and run the script again to get the final subgraph.
 
 # params:
-config_file_path = "./data/subgraphs/prostate_subgraphs/prostate-snomed-subgraph-config-1.2.yaml"
+config_file_path = "./data/subgraphs/prostate_subgraphs/prostate-snomed-subgraph-config-1.3.yaml"
 
 if __name__ == '__main__':
 
@@ -77,6 +77,7 @@ if __name__ == '__main__':
 
     id_property = subgraph_generation_config["center_node_identification_property"]
     base_label = subgraph_generation_config["base_label"]
+    neighborhood_extraction_size = subgraph_generation_config["neighborhood_extraction_size"]
 
     possible_path_count = 0
     found_paths_count = 0
@@ -130,7 +131,7 @@ if __name__ == '__main__':
             for i, path in enumerate(paths):
                 for j, relationship in enumerate(path):
                     for node in relationship.nodes:
-                        node_labels = list(node.labels)
+                        #node_labels = list(node.labels)
                         selected_nodes.add(node.element_id)
                     selected_relations.add(relationship.element_id)
                     #print()
@@ -141,6 +142,23 @@ if __name__ == '__main__':
         session.run(f"match (a) remove a:{subgraph_generation_config['label_center_nodes_with']}")
         for center_node_id in center_node_ids:
             session.run(f"match (a:{base_label}) where a.{id_property} = {center_node_id} set a:{subgraph_generation_config['label_center_nodes_with']}")
+
+    # Use neighborhood_extraction_size to add the whole neighborhood of the center nodes to the subgraph:
+    if neighborhood_extraction_size > 0:
+        print(f"Selected {len(selected_nodes)} nodes and {len(selected_relations)} relations.")
+        print(f"Adding neighborhood of size {neighborhood_extraction_size} to the subgraph...")
+        for center_node_id in tqdm(center_node_ids):
+            query = f"MATCH (a:{base_label})-[r*1..{neighborhood_extraction_size}]-(b) " \
+                    f"WHERE a.{id_property} = {center_node_id} " \
+                    f"RETURN r"
+            results = [r['r'] for r in session.run(query)]
+            for relations in results:
+                for relation in relations:
+                    #selected_nodes.add(result["ID(a)"])
+                    selected_nodes.add(relation.start_node.element_id)
+                    selected_nodes.add(relation.end_node.element_id)
+                    selected_relations.add(relation.element_id)
+        print(f"Selected {len(selected_nodes)} nodes and {len(selected_relations)} relations.")
 
     # print some stats:
     #print(f"{round(float(found_paths_count) / float(possible_path_count), 2) * 100}% fully connected center nodes.")
@@ -164,6 +182,9 @@ if __name__ == '__main__':
     print(f"selecting {len(selected_relations)} relations and {len(selected_nodes)} nodes with .{subgraph_name}=True in neo4j db...")
     session.run(f"match (n) REMOVE n.{subgraph_name}") # clear previous selections
     session.run(f"match (a)-[r]-(b) REMOVE r.{subgraph_name}") # clear previous selections
+    # dividing selected_nodes into batches of size 20:
+    selected_nodes_batched = [list(selected_nodes)[i:i + 20] for i in range(0, len(selected_nodes), 20)]
+
     for node_id in tqdm(selected_nodes):
         session.run(f"match (n) where ID(n) = {node_id} set n.{subgraph_name} = True")
     for relation_id in tqdm(selected_relations):
@@ -182,9 +203,10 @@ if __name__ == '__main__':
         # save configuration as json:
         json_out_path = os.path.join(os.path.dirname(config_file_path), subgraph_name + '.json')
         with open(json_out_path, 'w') as f:
-            subgraph_generation_config["stats"] = stats
-            subgraph_generation_config["node_connection_map"] = node_connection_map
-            json.dump(subgraph_generation_config, f, indent=4)
+            log_file = {k: subgraph_generation_config[k] for k in subgraph_generation_config}
+            log_file["stats"] = stats
+            log_file["node_connection_map"] = node_connection_map
+            json.dump(log_file, f, indent=4)
         print("saved configuration as json file at " + json_out_path)
 
     if subgraph_generation_config["test_run"]:
@@ -235,7 +257,9 @@ if __name__ == '__main__':
     while node_count > 0:
         cmd = input("Neo4j database is not empty. Can i erase the db? (y/n)")
         if cmd.lower() == "y":
+            session.run("MATCH ()-[r]-() DELETE r")
             session.run("MATCH (n) DETACH DELETE n")
+            print("done.")
         elif cmd.lower() == "n":
             print("aborted.")
             session.close()
@@ -262,6 +286,13 @@ if __name__ == '__main__':
                 if len(dublicated_ids) > 1:
                     for i_d in range(1, len(dublicated_ids)):
                         session.run(f"MATCH (a:{base_label}) where ID(a) = {dublicated_ids[i_d]} DETACH DELETE a")
+
+        # put the config file into the subgraph as metadata
+        meta_info = {k: subgraph_generation_config[k] for k in subgraph_generation_config if not str(k) in ["stats", "node_connection_map"]}
+        meta_info_str = ', '.join([f"{k}: '{meta_info[k]}'" for k in meta_info.keys()])
+        query = f"CREATE (:{subgraph_name} {{ {meta_info_str} }})"
+        session.run(query)
+        #print(query)
 
     except Exception as e:
         print(f"Error during import: {e}")

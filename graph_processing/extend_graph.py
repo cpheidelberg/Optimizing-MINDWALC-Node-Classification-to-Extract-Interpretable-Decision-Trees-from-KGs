@@ -54,7 +54,7 @@ def node_id_post_processor(node_id_string):
 def merge_HRT_triblet_into_neo4jDB(head_id, relation_name, tail_id, session,
                                    head_name=None, tail_name=None,
                                    head_props=None, tail_props=None,
-                                   modification_symbol = "modified"):
+                                   modification_symbol = "modified", allow_self_relations=False):
     '''
     Adds a new relation between head and tail with the given relation name to the neo4j db.
     If one of the passed nodes head_id or tail_id is None, the missing one will be added as new node to the neo4j db,
@@ -79,7 +79,7 @@ def merge_HRT_triblet_into_neo4jDB(head_id, relation_name, tail_id, session,
     head_props = "" if type(head_props)!=str else head_props
     tail_props = "" if type(tail_props)!=str else tail_props
 
-    if not head_id and not tail_id:
+    if not head_id:
         # try to find the head and tail nodes by their names:
         if type(head_name)==str:
             query = f"MATCH (n:{node_type}) WHERE n.{name_of_id_attribute}='{head_name}' RETURN n.{name_of_id_attribute} AS id"
@@ -92,6 +92,7 @@ def merge_HRT_triblet_into_neo4jDB(head_id, relation_name, tail_id, session,
             else:
                 head_id = None
 
+    if not tail_id:
         if type(tail_name)==str:
             query = f"MATCH (n:{node_type}) WHERE n.{name_of_id_attribute}='{tail_name}' RETURN n.{name_of_id_attribute} AS id"
             results = [r["id"] for r in session.run(query)]
@@ -103,9 +104,9 @@ def merge_HRT_triblet_into_neo4jDB(head_id, relation_name, tail_id, session,
             else:
                 tail_id = None
 
-        if not head_id and not tail_id:
-            log += "Could not find Head_id or Tail_id. Skipping."
-            return "", log
+    if not head_id and not tail_id:
+        log += "Could not find Head_id or Tail_id. Skipping."
+        return "", log
 
     if type(relation_name) != str:
         log += "WARNING: Relation-name is None.\n"
@@ -187,6 +188,13 @@ def merge_HRT_triblet_into_neo4jDB(head_id, relation_name, tail_id, session,
     else: # in this case, head or tail are newly added to the graph. So there will be no relation between them.
         res_are_there_relations_between = []
 
+    #### relation creation:
+    # first check if head and tail are the same node:
+    if not allow_self_relations and (head_id == tail_id):
+        log += f"Head and Tail are the same nodes. Skipping.\n"
+        return "", log
+
+    # create realtion:
     if not res_are_there_relations_between:  # if no relation exists: add new relation
         # add new relation:
         mod_query += f"MATCH (h:{node_type}) WHERE h.{name_of_id_attribute}='{head_id}' " \
@@ -199,11 +207,13 @@ def merge_HRT_triblet_into_neo4jDB(head_id, relation_name, tail_id, session,
             if r["type(r)"].lower() == relation_name.lower():
                 log += f"Relation between {head_id}|'{head_name}' and {tail_id}|'{tail_name}' with relation {relation_name} already exists.\n"
             else:
-                situation_description = f"Relation between ({head_id}|{head_name})-[{relation_name}]->({tail_id}|{tail_name}) does not exist yet.\n"
+                situation_description = f"Relation between \n({head_id}|{head_name})-[{relation_name}]->({tail_id}|{tail_name}) does not exist yet.\n"
                 if r["r"].start_node == r["ID(h)"]:
-                    user_input_request = situation_description + f"But ({head_id}|{head_name})-[{r['type(r)']}]->({tail_id}|{tail_name}) does exist."
-                else:
-                    user_input_request = situation_description + f"But ({head_id}|{head_name})<-[{r['type(r)']}]-({tail_id}|{tail_name}) does exist."
+                    user_input_request = situation_description + f"But \n({head_id}|{head_name})-[{r['type(r)']}]->({tail_id}|{tail_name}) does exist."
+                    coes_create_loop = False
+                else: # now we are creating a loop!!!
+                    user_input_request = situation_description + f"But \n({head_id}|{head_name})<-[{r['type(r)']}]-({tail_id}|{tail_name}) does exist."
+                    does_create_loop = True
 
                 log += user_input_request + "\n"
                 print(user_input_request, flush=True)
@@ -211,14 +221,34 @@ def merge_HRT_triblet_into_neo4jDB(head_id, relation_name, tail_id, session,
 
                 if cmd == "n":
                     # add new relation:
-                    mod_query += f"MATCH (h:{node_type}) WHERE h.{name_of_id_attribute}='{head_id}' " \
-                                f"MATCH (t:{node_type}) WHERE t.{name_of_id_attribute}='{tail_id}' " \
-                                f"MERGE (h)-[:{relation_name}"+" {"+f"{modification_symbol}: True"+"}]->(t);\n"
+                    if not does_create_loop:
+                        mod_query += f"MATCH (h:{node_type}) WHERE h.{name_of_id_attribute}='{head_id}' " \
+                                    f"MATCH (t:{node_type}) WHERE t.{name_of_id_attribute}='{tail_id}' " \
+                                    f"MERGE (h)-[:{relation_name}"+" {"+f"{modification_symbol}: True"+"}]->(t);\n"
 
-                    log += f"Is not similar. Added relation ({head_id}|{head_name})-[{relation_name}]->({tail_id}|{tail_name}).\n"
+                        log += f"Is not similar. Added relation ({head_id}|{head_name})-[{relation_name}]->({tail_id}|{tail_name}).\n"
+                    else:
+                        warn_message = (f"WARNING: Adding the relation\nA)\t({head_id}|{head_name})-[{relation_name}]->({tail_id}|{tail_name})\nwill create a loop in the graph, "
+                                        f"because the relation\nB)\t({head_id}|{head_name})<-[{r['type(r)']}-({tail_id}|{tail_name})\nalready exists."
+                                        f"\nDo you want to add A) to the graph and delete B)? If not, the relation will not be added and we will keep B).")
+                        print(warn_message, flush=True)
+                        cmd = input("(y/n): ").lower()
+                        if cmd == "y":
+                            mod_query += f"MATCH (h:{node_type}) WHERE h.{name_of_id_attribute}='{head_id}' " \
+                                        f"MATCH (t:{node_type}) WHERE t.{name_of_id_attribute}='{tail_id}' " \
+                                        f"MERGE (h)-[:{relation_name}"+" {"+f"{modification_symbol}: True"+"}]->(t);\n"
+                            mod_query += f"MATCH (h:{node_type}) WHERE h.{name_of_id_attribute}='{head_id}' " \
+                                        f"MATCH (t:{node_type}) WHERE t.{name_of_id_attribute}='{tail_id}' " \
+                                        f"MATCH (h)<-[r]-(t) WHERE type(r)='{r['type(r)']}' DELETE r;\n"
+                            log += (f"Is similar enough. Added relation ({head_id}|{head_name})-[{relation_name}]->({tail_id}|{tail_name}) "
+                                    f"and deleted the old one to avoid creation of a loop.\n")
+                        else:
+                            log += "Is not similar. Relation not added.\n"
 
                 else:
                     log += "Is similar enough. Relation not added.\n"
+
+                time.sleep(1)
 
     # at the end, all nodes should exist, now we can add the props to them:
     if head_props:
@@ -277,8 +307,19 @@ if __name__ == "__main__":
         if cmd == "y":
             for q in clearing_queries:
                 session.run(q)
-            time.sleep(1)
-            print("Old modifications deleted.")
+            print("Old modifications deleted. continue?", flush=True)
+            cmd = input("(y/n): ").lower()
+            if cmd != "y":
+                print("Aborting.")
+                exit()
+            query = f"match (a) where a.{modification_symbol} return distinct a.FSN"
+            node_count = len([r for r in session.run(query)])
+            query = f"match (a)-[r]-(b) where r.{modification_symbol} return distinct ID(r)"
+            relation_count = len([r for r in session.run(query)])
+            if node_count > 0 or relation_count > 0:
+                raise Exception(f"ERROR: Could not delete old modifications. There are still {node_count} nodes "
+                                f"and {relation_count} relations with the modification symbol '{modification_symbol}' "
+                                f"in the neo4j db.")
         else:
             print("Old modifications not deleted.")
 
