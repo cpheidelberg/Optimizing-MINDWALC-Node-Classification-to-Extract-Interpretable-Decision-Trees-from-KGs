@@ -1,0 +1,40 @@
+# neo4j db of new neo4j dub for subgraph requirements:
+# neo4j.conf:
+# dbms.memory.heap.initial_size=4G
+# dbms.memory.heap.max_size=4G
+# dbms.unmanaged_extension_classes=n10s.endpoint=/rdf
+# apoc-conf:
+# apoc.import.file.enabled=true
+# apoc.export.file.enabled=true
+
+# workflow:
+# first, find good value for max_path_length. In best case, you want to get 0.0% lonely center-nodes or very small value.
+# During this search, use the much faster test_run mode, which will still give you the correct lonely-center-nodes count
+# If you have the optimal max_path_length, set test_run to False and run the script again to get the final subgraph.
+
+{
+  "center_node_identification_property": "sctid",
+  "center_node_identification_property_type": "string",
+  "label_center_nodes_with": null, # can be null
+
+  # How to find the center nodes (ether provide id-list or simply the label of the center nodes):
+  "center_node_ids": null,
+  "center_node_label": "ProstateCenterNode",
+
+  "max_path_length": 3, # significantly increase the computation time but helps to find a stronger connected subgraph
+
+  # define a condition (as cypher query) which has to be fulfilled on each relation, r, along the path.
+  # As example you could use this query:
+  # "r.active is not NULL"
+  # to define the condition that each relation r needs to have an attribute "active" which is not NULL.
+  # If you do not need this, simply enter "true".
+  "path_search_relation_condition": "true",
+
+  "neighborhood_extraction_size": 1, # Does extract/select the neighborhood of the center_nodes. 0 means no neighborhood extraction (then, only the paths between the center nodes will be used to select the subgraph).
+  "search_for_directed_paths": false,
+  "subgraph_name": "prostate_subgraph",
+  "test_run": false, # test_run true is faster because it does only collect one smallest path for each start-target-node pair. But it does find less paths!
+  "export_rdf": true,
+  "export_as_neo4j_cypher_import_script": true,
+  "base_label": "ObjectConcept"  # nodes which do not have this label, will not be collected. (currently None not allowed)
+}

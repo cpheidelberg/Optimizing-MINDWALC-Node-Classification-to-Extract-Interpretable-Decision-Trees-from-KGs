@@ -1,0 +1,18 @@
+digraph DT{
+label=""
+fontname="Times-Roman"
+node[fontname="Times-Roman"];
+Node1 [label="neo4j://graph.individuals#36862, d = (0, 10)", fillcolor="#FFF2CC", color="#D6B656", style="rounded,filled", shape="box"];
+Node2 [label="neo4j://graph.individuals#3546, d = (0, 10, 8)", fillcolor="#FFF2CC", color="#D6B656", style="rounded,filled", shape="box"];
+Node3 [label="adenocarcinoma (GP3-5)", fillcolor="#DAE8FC", color="#6C8EBF", style="rounded,filled", shape="ellipse"];
+Node2 -> Node3 [label="false"];
+Node4 [label="GP5 mimicker", fillcolor="#DAE8FC", color="#6C8EBF", style="rounded,filled", shape="ellipse"];
+Node2 -> Node4 [label="true"];
+Node1 -> Node2 [label="false"];
+Node5 [label="neo4j://graph.individuals#3553, d = (0, 10)", fillcolor="#FFF2CC", color="#D6B656", style="rounded,filled", shape="box"];
+Node6 [label="GP4 mimicker", fillcolor="#DAE8FC", color="#6C8EBF", style="rounded,filled", shape="ellipse"];
+Node5 -> Node6 [label="false"];
+Node7 [label="GP3 mimicker", fillcolor="#DAE8FC", color="#6C8EBF", style="rounded,filled", shape="ellipse"];
+Node5 -> Node7 [label="true"];
+Node1 -> Node5 [label="true"];
+}

@@ -19,15 +19,19 @@ in_table_path = 'data/subgraphs/prostate_subgraphs/SyntheticInstanceGeneration1.
 
 # graph params:
 name_of_id_attribute = 'sctid'
+name_of_name_attribute = 'FSN'
 type_of_id_attribute = "string"
 node_type = "ObjectConcept"
 node_instance_type = "ProstateInstance"
-interweave_relation = "RECOGNIZED_PATTERN"
+interweave_relation = "EXISTENCE"
 name_of_label_node_attribute = "prostate_label"
+subterm_relation = "ISA"
+subterm_node_type = "SubTerm"
 
 # Instance generation params:
 number_of_instances_per_class = 111#111
 feature_weaving_probability = 1.0
+sub_term_insertion_probability = 0.5
 
 clearing_queries = [
     f"MATCH (n:{node_instance_type}) DETACH DELETE n"
@@ -90,13 +94,15 @@ if __name__ == "__main__":
             print("Aborting.")
             exit()
 
-    not_available_features = []
+    # remove all subterms:
+    session.run(f"MATCH (n:{subterm_node_type}) DETACH DELETE n")
 
+    not_available_features = []
     for i_class, class_label in enumerate(label_to_feature_list.keys()):
-        print(f"Generating {number_of_instances_per_class} instances for class '{class_label}'")
+        print(f"Generating {number_of_instances_per_class} instances for class '{class_label}'", flush=True)
         feature_list = label_to_feature_list[class_label]
 
-        # generate instances:
+        # generate & interweave instances:
         for i in tqdm(r_i for r_i in range(number_of_instances_per_class)):
             # generate a random instance:
             instance_id = f"case_{i_class}-{i}"
@@ -112,7 +118,6 @@ if __name__ == "__main__":
 
             # connect the instance node with the features:
             for f in instance_features:
-
                 if '|' in f:
                     node_id = f.split('|')[0]
                     while node_id[-1] == ' ':
@@ -124,15 +129,28 @@ if __name__ == "__main__":
 
                 # check if feature node f is present in the graph:
                 check_query = (f"MATCH (f:{node_type}) WHERE f.{name_of_id_attribute} = '{node_id}' "
-                               f"RETURN ID(f)")
-                result = session.run(check_query)
-                if len([r for r in result]) == 0:
+                               f"RETURN ID(f), f.{name_of_name_attribute} as name")
+                result = [r for r in session.run(check_query)]
+                if len(result) == 0:
                     not_available_features.append(node_id)
                     continue
+                else:
+                    node_name = result[0]['name']
 
-                connect_feature_query = (f"MATCH (i:{node_instance_type}) WHERE  i.name = '{instance_id}' "
-                                         f"MATCH (f:{node_type}) WHERE f.{name_of_id_attribute} = '{node_id}' "
-                                         f"MERGE (i)-[:{interweave_relation}]->(f)")
+                if np.random.rand() < sub_term_insertion_probability:
+                    session.run(f"MERGE (n:{node_type}:{subterm_node_type} {{ {name_of_id_attribute}: 'sub-term-{node_id}', {name_of_name_attribute}: 'Sub-{node_name}' }}) ")
+
+                    session.run(f"MATCH (n:{node_type}) WHERE n.{name_of_id_attribute} = '{node_id}' \n"
+                                f"MATCH (s:{node_type}) WHERE s.{name_of_id_attribute} = 'sub-term-{node_id}' \n"
+                                f"MERGE (s)-[:{subterm_relation}]->(n)")
+
+                    connect_feature_query = (f"MATCH (i:{node_instance_type}) WHERE  i.name = '{instance_id}' "
+                                             f"MATCH (f:{node_type}) WHERE f.{name_of_id_attribute} = 'sub-term-{node_id}' "
+                                             f"MERGE (i)-[:{interweave_relation}]->(f)")
+                else:
+                    connect_feature_query = (f"MATCH (i:{node_instance_type}) WHERE  i.name = '{instance_id}' "
+                                             f"MATCH (f:{node_type}) WHERE f.{name_of_id_attribute} = '{node_id}' "
+                                             f"MERGE (i)-[:{interweave_relation}]->(f)")
                 session.run(connect_feature_query)
 
     print("\nFinished instance generation and interweaving.")

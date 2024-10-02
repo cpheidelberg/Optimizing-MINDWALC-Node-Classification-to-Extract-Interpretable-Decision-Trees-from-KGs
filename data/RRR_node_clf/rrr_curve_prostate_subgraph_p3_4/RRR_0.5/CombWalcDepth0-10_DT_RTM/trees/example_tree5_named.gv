@@ -1,0 +1,22 @@
+digraph "DT" {
+fontname="Times-Roman";
+label="";
+node [fontname="Times-Roman"];
+Node1 [color="#D6B656", fillcolor="#FFF2CC", label="Xanthomatous deposition, d = 0 - 10", shape="box", style="rounded,filled"];
+Node2 [color="#D6B656", fillcolor="#FFF2CC", label="ISA Epithelial metaplasia, d = 0 - 10", shape="box", style="rounded,filled"];
+Node3 [color="#D6B656", fillcolor="#FFF2CC", label="ISA Prostatic structure, d = 0 - 10", shape="box", style="rounded,filled"];
+Node4 [color="#6C8EBF", fillcolor="#DAE8FC", label=<adenocarcinoma (GP3-5)<br/>100/117 correct>, shape="ellipse", style="rounded,filled"];
+Node5 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP4 mimicker<br/>86/103 correct>, shape="ellipse", style="rounded,filled"];
+Node6 [color="#D6B656", fillcolor="#FFF2CC", label="squamous apperance with e.g. markers like p63, d = 0 - 10 - 5", shape="box", style="rounded,filled"];
+Node7 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP3 mimicker<br/>80/80 correct>, shape="ellipse", style="rounded,filled"];
+Node8 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP5 mimicker<br/>6/6 correct>, shape="ellipse", style="rounded,filled"];
+Node9 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP5 mimicker<br/>94/94 correct>, shape="ellipse", style="rounded,filled"];
+Node1 -> Node2  [key=0, label="false"];
+Node1 -> Node9  [key=0, label="true"];
+Node2 -> Node3  [key=0, label="false"];
+Node2 -> Node6  [key=0, label="true"];
+Node3 -> Node4  [key=0, label="false"];
+Node3 -> Node5  [key=0, label="true"];
+Node6 -> Node7  [key=0, label="false"];
+Node6 -> Node8  [key=0, label="true"];
+}

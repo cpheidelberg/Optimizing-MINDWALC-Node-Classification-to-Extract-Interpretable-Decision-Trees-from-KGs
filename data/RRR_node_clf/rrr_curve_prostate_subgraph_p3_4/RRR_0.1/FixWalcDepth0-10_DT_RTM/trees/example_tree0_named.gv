@@ -1,0 +1,22 @@
+digraph "DT" {
+fontname="Times-Roman";
+label="";
+node [fontname="Times-Roman"];
+Node1 [color="#D6B656", fillcolor="#FFF2CC", label="ASSOCIATED_MORPHOLOGY Granulomatous inflammation, d = 7", shape="box", style="rounded,filled"];
+Node2 [color="#D6B656", fillcolor="#FFF2CC", label="ISA Morphologically abnormal structure, d = 7", shape="box", style="rounded,filled"];
+Node3 [color="#D6B656", fillcolor="#FFF2CC", label="EXISTENCE Sub-basal cells retained, d = 1", shape="box", style="rounded,filled"];
+Node4 [color="#6C8EBF", fillcolor="#DAE8FC", label=<adenocarcinoma (GP3-5)<br/>99/99 correct>, shape="ellipse", style="rounded,filled"];
+Node5 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP4 mimicker<br/>26/26 correct>, shape="ellipse", style="rounded,filled"];
+Node6 [color="#D6B656", fillcolor="#FFF2CC", label="OCCURS_IN Mucinous metaplasia, d = 3", shape="box", style="rounded,filled"];
+Node7 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP4 mimicker<br/>74/100 correct>, shape="ellipse", style="rounded,filled"];
+Node8 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP3 mimicker<br/>74/74 correct>, shape="ellipse", style="rounded,filled"];
+Node9 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP5 mimicker<br/>100/100 correct>, shape="ellipse", style="rounded,filled"];
+Node1 -> Node2  [key=0, label="false"];
+Node1 -> Node9  [key=0, label="true"];
+Node2 -> Node3  [key=0, label="false"];
+Node2 -> Node6  [key=0, label="true"];
+Node3 -> Node4  [key=0, label="false"];
+Node3 -> Node5  [key=0, label="true"];
+Node6 -> Node7  [key=0, label="false"];
+Node6 -> Node8  [key=0, label="true"];
+}

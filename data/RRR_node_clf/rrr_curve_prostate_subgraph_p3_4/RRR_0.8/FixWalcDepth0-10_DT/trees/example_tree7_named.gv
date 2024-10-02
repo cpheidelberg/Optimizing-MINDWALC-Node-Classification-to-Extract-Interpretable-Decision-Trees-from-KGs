@@ -1,0 +1,30 @@
+digraph "DT" {
+fontname="Times-Roman";
+label="";
+node [fontname="Times-Roman"];
+Node1 [color="#D6B656", fillcolor="#FFF2CC", label="Gleason Pattern 3, d = 6", shape="box", style="rounded,filled"];
+Node2 [color="#D6B656", fillcolor="#FFF2CC", label="Gleason Pattern 5, d = 6", shape="box", style="rounded,filled"];
+Node3 [color="#D6B656", fillcolor="#FFF2CC", label="Cribriform histologic pattern, d = 6", shape="box", style="rounded,filled"];
+Node4 [color="#6C8EBF", fillcolor="#DAE8FC", label=<adenocarcinoma (GP3-5)<br/>32/62 correct>, shape="ellipse", style="rounded,filled"];
+Node5 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP4 mimicker<br/>29/33 correct>, shape="ellipse", style="rounded,filled"];
+Node6 [color="#D6B656", fillcolor="#FFF2CC", label="Gleason Pattern 4, d = 4", shape="box", style="rounded,filled"];
+Node7 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP5 mimicker<br/>78/84 correct>, shape="ellipse", style="rounded,filled"];
+Node8 [color="#6C8EBF", fillcolor="#DAE8FC", label=<adenocarcinoma (GP3-5)<br/>8/8 correct>, shape="ellipse", style="rounded,filled"];
+Node9 [color="#D6B656", fillcolor="#FFF2CC", label="Degenerative abnormality, d = 6", shape="box", style="rounded,filled"];
+Node10 [color="#D6B656", fillcolor="#FFF2CC", label="Immunohistochemistry procedure, d = 2", shape="box", style="rounded,filled"];
+Node11 [color="#6C8EBF", fillcolor="#DAE8FC", label=<adenocarcinoma (GP3-5)<br/>54/129 correct>, shape="ellipse", style="rounded,filled"];
+Node12 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP4 mimicker<br/>17/36 correct>, shape="ellipse", style="rounded,filled"];
+Node13 [color="#6C8EBF", fillcolor="#DAE8FC", label=<GP3 mimicker<br/>40/48 correct>, shape="ellipse", style="rounded,filled"];
+Node1 -> Node2  [key=0, label="false"];
+Node1 -> Node9  [key=0, label="true"];
+Node2 -> Node3  [key=0, label="false"];
+Node2 -> Node6  [key=0, label="true"];
+Node3 -> Node4  [key=0, label="false"];
+Node3 -> Node5  [key=0, label="true"];
+Node6 -> Node7  [key=0, label="false"];
+Node6 -> Node8  [key=0, label="true"];
+Node9 -> Node10  [key=0, label="false"];
+Node9 -> Node13  [key=0, label="true"];
+Node10 -> Node11  [key=0, label="false"];
+Node10 -> Node12  [key=0, label="true"];
+}

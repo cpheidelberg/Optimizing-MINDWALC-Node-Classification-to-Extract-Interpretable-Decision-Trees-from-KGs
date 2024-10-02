@@ -42,11 +42,12 @@ concepts_to_disconnect = []#fire_water_grass_concepts + NORMAL_VULNERABILITY_AGA
 relations_to_disconnect = []#["CAN_MIMICK"]
 node_types_to_consider = ['ObjectConcept']  # allow all concept-types, containing also the exposed ModType concepts
 
-########### random relation removement params ###############
+########### random relation removement and graph params ###############
 relation_types_not_allowed_to_delete = [] #["BELONGS_TO_GROUP"]
 rrr_max = 0.9  # 0.9 0.1
 rrr_start = 0.0
 step_count = 10
+rdf_predicates_to_filter_out = [rdflib.URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")] # In our use case we dont want to allow the rdf:type predicate to be used for classification.
 
 ########### tree params ###############
 # for decision tree visualization:
@@ -58,15 +59,15 @@ store_all_trees = True
 
 overwrite_output_files = False
 n_jobs = 1
-post_prune = False
+post_prune = True
 fold_amount = 10
 
 # mindwalc params:
 # default is 8. (4 would mean: do not use background knowledge, 6=maximum +1 step into knowledge, 8=+2 steps into knowledge...)
 path_max_depths = [10, 10, 10, 10, 10, 10]
 path_min_depths = [0, 0, 0, 0, 0, 0]
-max_tree_depth = None  # default is None
-min_samples_leaf = 10  # the minimum amount of available walks required to continue to build the DT. default is 10.
+max_tree_depth = 3  # default is None
+min_samples_leaf = 20  # the minimum amount of available walks required to continue to build the DT. default is 10.
 use_forests = [False, False, False, False, False, False]
 forest_size = [1, 1, 1, 1, 1, 1, 1, 1] # for random forest (how many estimators/trees shall be used)
 fixed_walking_depths = [True, True, False, False, None, None]
@@ -202,8 +203,8 @@ def main():
                     session.run(f"match (a) where id(a) = {id} remove a.{subgraph_name}")
                     removed_report_nodes += 1
 
-            print(f"removed {removed_report_nodes} featureless report nodes from subgraph {subgraph_name} "
-                  f"after removing {round(random_relation_removement*100,1)}% relations.")
+            print(f"\nRemoved {removed_report_nodes} featureless report nodes from subgraph {subgraph_name} "
+                  f"after removing {round(random_relation_removement*100,1)}% relations.", flush=True)
 
         # adding subgraph size to subgraph metha:
         r = session.run(f"match (c) where c.{subgraph_name} return count(c) as amount")
@@ -248,8 +249,8 @@ def main():
         cypher_to_rdf(report_subgraph_query, rdf_subgraph_file, addr, auth)
         g = rdflib.Graph()
         g.parse(rdf_subgraph_file, format='text/n3')
-        kg_non_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=False)
-        kg_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=True)
+        kg_non_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=False, label_predicates=rdf_predicates_to_filter_out)
+        kg_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=True, label_predicates=rdf_predicates_to_filter_out)
 
         # create and clean training data: Remove each report which does not appear in our graph:
         traintest_ents = []
@@ -270,7 +271,7 @@ def main():
             warn(f"ERROR: Could not find any training data points in the knowledge graph '{rdf_subgraph_file}'.")
             continue
         else:
-            print(f"Found {len(traintest_ents)} training data points.")
+            print(f"Found {len(traintest_ents)} training data points.", flush=True)
 
         ########### get some statistics and save them ###########
         labels_set = set(train_data["label"])
@@ -318,7 +319,6 @@ def main():
                          f'{"RF" + str(n_estimators) if use_forest else "DT"}{"_SKL" if use_sklearn[setting_id] else ""}'
                                   f'{"_RTM" if relation_tail_merging[setting_id] else ""}')
 
-            print(tree_config_string)
             result_path = create_new_result_folder_in(result_path_RRR, True,
                                                       tree_config_string)
             if tree_config_string not in list(mean_values.keys()):
@@ -508,7 +508,7 @@ def main():
             mean_values[tree_config_string]["node_count"].append(len(kg.vertices))
             mean_values[tree_config_string]["relation_count"].append(sum([len(x) for x in kg.transition_matrix.values()]))
 
-            print(f"f1: {mean_values[tree_config_string]['f1_mean'][-1]} +- {mean_values[tree_config_string]['f1_std'][-1]}")
+            print(f"{tree_config_string}\tf1: {mean_values[tree_config_string]['f1_mean'][-1]} +- {mean_values[tree_config_string]['f1_std'][-1]}", flush=True)
 
             # save data as excel table:
             df = pd.DataFrame(cross_val_results)

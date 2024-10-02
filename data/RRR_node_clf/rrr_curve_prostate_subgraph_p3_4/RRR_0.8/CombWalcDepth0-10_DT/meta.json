@@ -1,0 +1,16 @@
+{
+    "amount_trees": 1,
+    "max_tree_depth": 3,
+    "max_walk_depth": 10,
+    "min_walk_depth": 0,
+    "min_samples_leaf": 20,
+    "measured_with:": "10-fold cross validations",
+    "concept_types_to_consider": [
+        "ObjectConcept"
+    ],
+    "fixed_walking_depth": null,
+    "relation_types_not_allowed_to_delete": [],
+    "relations_to_disconnect": [],
+    "concepts_to_disconnect": [],
+    "relation_tail_merging": false
+}

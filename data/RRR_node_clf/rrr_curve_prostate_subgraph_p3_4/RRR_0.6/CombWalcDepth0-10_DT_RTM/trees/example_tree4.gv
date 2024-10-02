@@ -1,0 +1,22 @@
+digraph DT{
+label=""
+fontname="Times-Roman"
+node[fontname="Times-Roman"];
+Node1 [label="neo4j://graph.schema#OCCURS_IN_MODIFIED_neo4j://graph.individuals#3568, d = (0, 10)", fillcolor="#FFF2CC", color="#D6B656", style="rounded,filled", shape="box"];
+Node2 [label="neo4j://graph.individuals#3389, d = (0, 10)", fillcolor="#FFF2CC", color="#D6B656", style="rounded,filled", shape="box"];
+Node3 [label="neo4j://graph.schema#ISA_MODIFIED_neo4j://graph.individuals#36900, d = (0, 10)", fillcolor="#FFF2CC", color="#D6B656", style="rounded,filled", shape="box"];
+Node4 [label="adenocarcinoma (GP3-5)", fillcolor="#DAE8FC", color="#6C8EBF", style="rounded,filled", shape="ellipse"];
+Node3 -> Node4 [label="false"];
+Node5 [label="GP4 mimicker", fillcolor="#DAE8FC", color="#6C8EBF", style="rounded,filled", shape="ellipse"];
+Node3 -> Node5 [label="true"];
+Node2 -> Node3 [label="false"];
+Node6 [label="neo4j://graph.individuals#34987, d = (0, 10)", fillcolor="#FFF2CC", color="#D6B656", style="rounded,filled", shape="box"];
+Node7 [label="GP3 mimicker", fillcolor="#DAE8FC", color="#6C8EBF", style="rounded,filled", shape="ellipse"];
+Node6 -> Node7 [label="false"];
+Node8 [label="GP5 mimicker", fillcolor="#DAE8FC", color="#6C8EBF", style="rounded,filled", shape="ellipse"];
+Node6 -> Node8 [label="true"];
+Node2 -> Node6 [label="true"];
+Node1 -> Node2 [label="false"];
+Node9 [label="GP5 mimicker", fillcolor="#DAE8FC", color="#6C8EBF", style="rounded,filled", shape="ellipse"];
+Node1 -> Node9 [label="true"];
+}

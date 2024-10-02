@@ -6,29 +6,29 @@ import numpy as np
 
 def main():
     axis_label_font_size = 12
-    dataset_num = "3"
-    classified_nodes = "prostate_subgraph_p3"  # Current oprions: PokeReport, MergedPokemon, HierarchicalPokemon
-    dataset_path = f"./data/RRR_node_clf/rrr_curve_{classified_nodes}_{dataset_num}"
-    colors = ['g', 'b', 'r', 'c', 'm', 'y', 'k']
+    dataset_num = "4"
+    graph_name = "prostate_subgraph_p3"  # Current oprions: PokeReport, MergedPokemon, HierarchicalPokemon
+    dataset_path = f"./data/RRR_node_clf/rrr_curve_{graph_name}_{dataset_num}"
+    colors = ['g', 'y', 'b', 'c', 'r', 'orange', 'k', 'm']
 
     hide_x = False
 
-    in_labels = ["MINDWALC DT", "Frequency based DT"]
-    in_tables = [f"{dataset_path}/FixWalcDepth4-10_DT_means.xlsx",
-                 f"{dataset_path}/FixWalcDepth4-4_DT_means.xlsx"]
 
-    '''in_labels = ["MINDWALC RF4", "MINDWALC RF8", "MINDWALC RF16", "MINDWALC RF32", "MINDWALC RF64"]
-    in_tables = [f"{dataset_path}/WalcDepth8_RF4_means.xlsx",
-                 f"{dataset_path}/WalcDepth8_RF8_means.xlsx",
-                 f"{dataset_path}/WalcDepth8_RF16_means.xlsx",
-                 f"{dataset_path}/WalcDepth8_RF32_means.xlsx",
-                 f"{dataset_path}/WalcDepth8_RF64_means.xlsx"
+    in_labels = ["Flexible walk", "Flexible walk with RTM",
+                 "Combined walk", "Combined walk with RTM",
+                 "Fixed walk", "Fixed walk with RTM"]
+    in_tables = [f"{dataset_path}/FlexWalcDepth0-10_DT_means.xlsx",
+                 f"{dataset_path}/FlexWalcDepth0-10_DT_RTM_means.xlsx",
+                 f"{dataset_path}/CombWalcDepth0-10_DT_means.xlsx",
+                 f"{dataset_path}/CombWalcDepth0-10_DT_RTM_means.xlsx",
+                 f"{dataset_path}/FixWalcDepth0-10_DT_means.xlsx",
+                 f"{dataset_path}/FixWalcDepth0-10_DT_RTM_means.xlsx"
                  ]
-    '''
+
 
     # collection all .xlsx files in the directory:
-    in_tables = [f"{dataset_path}/{f}" for f in os.listdir(dataset_path) if f.endswith(".xlsx")]
-    in_labels = [f.split("/")[-1].replace(".xlsx", "") for f in in_tables]
+    #in_tables = [f"{dataset_path}/{f}" for f in os.listdir(dataset_path) if f.endswith(".xlsx")]
+    #in_labels = [f.split("/")[-1].replace(".xlsx", "") for f in in_tables]
 
     #in_labels = ["Frequency based DT", "MINDWALC DT"]
     #in_labels = ["Flexible walking depth", "Combined walking depth", "Fixed walking depth"]
