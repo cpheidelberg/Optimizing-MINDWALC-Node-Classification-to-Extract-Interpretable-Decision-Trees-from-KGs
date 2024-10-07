@@ -1,7 +1,4 @@
-from graphdatascience import GraphDataScience
 from warnings import warn
-import sys, argparse, os
-import argparse
 import sys, os
 from MINDWALC.neo4j2rdf import cypher_to_rdf
 from utils.filesystem import create_new_result_folder_in
