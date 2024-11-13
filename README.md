@@ -4,10 +4,12 @@
 
 This python project was created as part of the article: \
 "_Investigating and Optimizing MINDWALC Node Classification to Extract Interpretable Decision Trees from Knowledge Graphs_".
+Which is a follow-up to the original MINDWALC paper of : \
+"[MINDWALC: mining interpretable, discriminative walks for classification of nodes in a knowledge graph](https://bmcmedinformdecismak.biomedcentral.com/articles/10.1186/s12911-020-01134-w)"
 
-The paper can be found [here](https://) (link commming soon). \
-The MINDWALC optimizations proposed in the article are implemented in the original [MINDWALC repo](https://github.com/predict-idlab/MINDWALC). \
-This Project contains the scripts used to generate the results in the article.
+The paper can be found [here](https://) (link commming soon, paper is in reviewing process). \
+We are in contact with with the MINDWALC inventors and our proposed MINDWALC optimizations will 
+soon also be available in the original [MINDWALC repo](https://github.com/predict-idlab/MINDWALC). 
 
 ## Requirements and Installation
 
@@ -16,30 +18,28 @@ Currently, MINDWALC works best on Linux or MacIS.
 Windows does also work, however, since MINDWALC uses [ray](https://docs.ray.io/en/latest/ray-overview/installation.html), 
 which is currently not fully supported on Windows (only experimental), you may encounter some issues on this OS. 
 
-### 1) Install MINDWALC
+### 1) Install graphviz
 
-To use this project, you need to install the latest MINDWALC package. \
-Currently, MINDWALC is not available on PyPi, so you need to install it manually.
+Graphviz is used to visualize trained decision trees and export them as pdf files. 
+If you need this feature, please install the graphviz kernel on your os:
 
-For this, please first clone the [MINDWALC repo](https://github.com/predict-idlab/MINDWALC) into another directory.\
-To avoid git issues, delete the ````.git```` folder in the MINDWALC directory. \
-Then, copy the MINDWALC directory into the root directory of this project. \
-Check the ````MINDWALC/README.md```` for installation instructions and make sure that the MINDWALC 
-is working properly by running the example script in ```MINDWALC/mindwalc/Example (AIFB).ipynb```.
+- Ubuntu/Debian: `sudo apt-get install graphviz`
+- MacOS: `brew install graphviz`
+- windows: https://graphviz.org/download/
 
-### 2) Install the required python packages
+### 2) Install required python packages
 
-Then, install the required python packages:
+Install the required python packages in your python environment with pip:
 ```
 pip install -r requirements.txt
 ```
 
-### 3) Install Neo4j Desktop
+### 3) (optional) Install Neo4j Desktop
 
-Many of our scripts process graphs stored as Neo4j databases, 
-so you need to download and install Neo4j Desktop on your OS of choice ([https://neo4j.com/download/](https://neo4j.com/download/)).
+Many of our scripts process graphs stored as Neo4j databases (e.g. `node_classification/RRR_node_classification.py`). \ 
+To make these scripts work, you need to download and install Neo4j Desktop on your OS of choice ([https://neo4j.com/download/](https://neo4j.com/download/)).
 
-## How to get the graph-datasets, used in the paper:
+## How to get the graph-datasets, used in our paper:
 
 ### AIFB Graph
 See [MINDWALC/mindwalc/data/AIFB](MINDWALC/mindwalc/data/AIFB).
@@ -75,22 +75,48 @@ See  `./data/TreeOfLife/TreeOfLife.1.1.dump` **TODO: Export the dump file!!!**
 ### Combined Pokemon graph
 Since this database is based on the GottaGraphEmAll Pokemon Graph, we cannot provide it publicly.
 
-## Usage
+## Usage and Reproducing paper results
 
-To run our experiments, you first need to start the corresponding Neo4j graph (e.g. firtst start the neo4j db of the dataset xxx to run tests on this db).
+### 1) Benchmark-tests on AIFB, BGS and MUTAG datasets:
+
+This is quite uncomplicated and therefore is recommended to start with. \
+To run our experiments (in paper: Chapter 3.4), you need to use [node_classification/benchmark_knowledge_graphs.py](node_classification/benchmark_knowledge_graphs.py).
+First, uncommend the desired dataset in the script and then run it. \
+Although MINDWALC is quite fast, the script may take some time to finish, since it does some grid-search for hyperparameter optimization on each (of 10) runs.
+
+To validate a test-run, use the script 
+[node_classification/validade_benchmark_KG_results.py](node_classification/validade_benchmark_KG_results.py) 
+to parse the results and plot f1 and accuracy tables. 
+
+### 2) Tests with Random Relation Removement (RRR) on toy datasets:
+
+To run our experiments (in paper: Chapter 3.1, 3.2 and 3.3), you need to use [node_classification/RRR_node_classification.py](node_classification/RRR_node_classification.py). 
+
+Before starting this script, you first need to start the corresponding Neo4j graph, which you want to process. 
+(e.g. firtst start the neo4j db of the neo4j-dataset `./data/TreeOfLife/TreeOfLife.1.1.dump` to run tests on this db).
 
 Then, configure (edit global variables in script) 
 and run the script [node_classification/RRR_node_classification.py](node_classification/RRR_node_classification.py)
 which stepwise destroys the "Instance Knowledge" by randomly removing the relations between instance-nodes and its neighbors.
-(Process is called RTM - Relation Tail Merging, aka RRR - Random Relation Removement). \
+(Process is called "_instance knowledge degradation_", aka _RRR - Random Relation Removement_). \
 On Each destruction-step, the script will run the MINDWALC node classification algorithm (according to your configuration) 
 on the graph and store the results in a structured way (see console output for details).
 
-Then, to plot the same curves as shown in the paper, configure and run the script [node_classification/RRR_node_clfs_plot.py](node_classification/RRR_node_clfs_plot.py) accordingly.
+Then, to plot the same instance-knowledge degradation curves as shown in the paper, 
+configure and run the script 
+[node_classification/RRR_node_clfs_plot.py](node_classification/RRR_node_clfs_plot.py) accordingly.
+
+## Acknowledgements
+
+We would like to thank the inventors of [MINDWALC](https://github.com/predict-idlab/MINDWALC), without whom this work would not exist. 
+This includes in particular Dr. Gilles Vandewiele et al. 
+who developed MINDWALC while working at the research group IDLab, Ghent University - imec.
 
 ## citation
 
 ... coming soon...
+
+
 
 
 

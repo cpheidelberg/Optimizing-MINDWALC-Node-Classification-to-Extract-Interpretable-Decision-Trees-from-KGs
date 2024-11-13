@@ -240,7 +240,7 @@ def train_model(g, train_file, test_file, entity_col, label_col, label_predicate
     #pickle.dump(results, open(output_file, 'wb+'))
 
 ###################### BGS #####################################
-rdf_file = 'MINDWALC/mindwalc/data/BGS/completeDataset.nt'
+'''rdf_file = 'MINDWALC/mindwalc/data/BGS/completeDataset.nt'
 format = 'nt'
 train_file = 'MINDWALC/mindwalc/data/BGS/trainingSet(lith).tsv'
 test_file = 'MINDWALC/mindwalc/data/BGS/testSet(lith).tsv'
@@ -251,23 +251,10 @@ label_predicates = [
     rdflib.term.URIRef('http://data.bgs.ac.uk/ref/Lexicon/hasLithogenesisDescription'),
     rdflib.term.URIRef('http://data.bgs.ac.uk/ref/Lexicon/hasTheme')
 ]
-out_folder = "bgs4"
-
-###################### AM ######################################
-'''rdf_file = 'MINDWALC/mindwalc/data/AM/rdf_am-data.ttl'
-format = 'turtle'
-train_file = 'MINDWALC/mindwalc/data/AM/trainingSet.tsv'
-test_file = 'MINDWALC/mindwalc/data/AM/testSet.tsv'
-entity_col = 'proxy'
-label_col = 'label_cateogory'
-label_predicates = [
-   rdflib.term.URIRef('http://purl.org/collections/nl/am/objectCategory'),
-   rdflib.term.URIRef('http://purl.org/collections/nl/am/material')
-]
-out_folder = "am"'''
+out_folder = "bgs"'''
 
 ##################### AIFB #####################################
-'''
+
 rdf_file = 'MINDWALC/mindwalc/data/AIFB/aifb.n3'
 format = 'n3'
 train_file = 'MINDWALC/mindwalc/data/AIFB/AIFB_train.tsv'
@@ -279,7 +266,7 @@ label_predicates = [
         rdflib.URIRef('http://swrc.ontoware.org/ontology#employs'),
         rdflib.URIRef('http://swrc.ontoware.org/ontology#carriedOutBy')
 ]
-out_folder = "aifb3"'''
+out_folder = "aifb"
 
 ##################### MUTAG ####################################
 '''rdf_file = 'MINDWALC/mindwalc/data/MUTAG/carcinogenesis.owl'
@@ -291,7 +278,7 @@ label_col = 'label_mutagenic'
 label_predicates = [
     rdflib.term.URIRef('http://dl-learner.org/carcinogenesis#isMutagenic')
 ]
-out_folder = "mutag4"'''
+out_folder = "mutag"'''
 
 
 # Load in our graph using rdflib

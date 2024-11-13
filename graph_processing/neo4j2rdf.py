@@ -13,12 +13,12 @@ def cypher_to_rdf(cypher, save_path, addr, auth, format='text/n3'):
     - neo4j database with neosemantics plugin installed
     - in neo4j.conf: server.unmanaged_extension_classes=n10s.endpoint=/rdf
 
-    :param cypher:
-    :param save_path:
-    :param addr:
-    :param auth:
-    :param format:
-    :return:
+    :param cypher: Cypher query to select the part of the running neo4j database that should be saved as rdf file
+    :param save_path: Path where the rdf file should be saved
+    :param addr: Address of the neo4j database
+    :param auth: Tuple with username and password for the neo4j database
+    :param format: Format of the rdf file (default: 'text/n3')
+    :return: None
     '''
 
     url = f'http://{addr}:7474/rdf/neo4j/cypher'

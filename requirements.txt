@@ -7,3 +7,11 @@ numpy
 rdflib
 scikit-learn
 graphviz
+joblib
+matplotlib
+networkx
+psutil
+ray
+scipy
+tqdm
+ipywidgets
