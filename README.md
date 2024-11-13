@@ -11,6 +11,11 @@ This Project contains the scripts used to generate the results in the article.
 
 ## Requirements and Installation
 
+**OS-WARNING:** 
+Currently, MINDWALC works best on Linux or MacIS. 
+Windows does also work, however, since MINDWALC uses [ray](https://docs.ray.io/en/latest/ray-overview/installation.html), 
+which is currently not fully supported on Windows (only experimental), you may encounter some issues on this OS. 
+
 ### 1) Install MINDWALC
 
 To use this project, you need to install the latest MINDWALC package. \
@@ -24,20 +29,30 @@ is working properly by running the example script in ```MINDWALC/mindwalc/Exampl
 
 ### 2) Install the required python packages
 
-Create a new environment, then install the required python packages with: \
-```pip install -r requirements.txt```
+Then, install the required python packages:
+```
+pip install -r requirements.txt
+```
 
 ### 3) Install Neo4j Desktop
 
-All your tests scripts do process graphs stored as Neo4j databases, so you need to install Neo4j Desktop. 
+Many of our scripts process graphs stored as Neo4j databases, 
+so you need to download and install Neo4j Desktop on your OS of choice ([https://neo4j.com/download/](https://neo4j.com/download/)).
 
-So please download and install Neo4j Desktop on your OS ([https://neo4j.com/download/](https://neo4j.com/download/)).
+## How to get the graph-datasets, used in the paper:
 
-## How to get the graph-datasets
+### AIFB Graph
+See [MINDWALC/mindwalc/data/AIFB](MINDWALC/mindwalc/data/AIFB).
+
+### BGS Graph
+Can be obtained at https://data.dws.informatik.uni-mannheim.de/rmlod/LOD_ML_Datasets/. 
+
+### MUTAG Graph
+Can be obtained at https://data.dws.informatik.uni-mannheim.de/rmlod/LOD_ML_Datasets/. 
 
 ### ProstateToyGraph
 
-This graph is based on the Snomed CT ontology. Therefore, we cannot provide the graph directly. 
+This graph is based on the Snomed CT ontology. Therefore, we cannot provide the graph directly.
 However, if you have access to Snomed CT, you can generate the graph yourself.
 
 This are the necessary steps:
@@ -45,17 +60,20 @@ This are the necessary steps:
 2. Next, run the script [./graph_processing/ProstateToyGraph/extend_graph.py](./graph_processing/ProstateToyGraph/extend_graph.py) to extend the graph with the prostate cancer related nodes and edges. It will also mark some nodes with label `ProstateCenterNode`. \
 Attention: The execution-terminal will ask you several question about how to handle certain conflicts. To create the exact same dataset as in our paper, always type '`n`' for '`Is it similar?`' questions and '`y`' for '`Do you want to add A) to the graph ...`' questions.
 3. Next. run the script [./graph_processing/centernode_based_subgraph_generation.py](./graph_processing/centernode_based_subgraph_generation.py) to extract a smaller part of the whole snomed graph that is centered around the prostate cancer related nodes of type `ProstateCenterNode`. \
-This way smaller graph will be easier to handle, explore and process. Also here, the execution-terminal will sometimes stop to give you some instructions (copy paste some files, launch new neo4j db) and wait for your input.
+This way smaller graph will be easier to handle, explore and process. \
+The execution-terminal will sometimes stop to give you some instructions (copy paste some files, launch new neo4j db) and wait for your input.
 4. Finally, run the script [./graph_processing/ProstateToyGraph/add_instances_to_graph.py](./graph_processing/ProstateToyGraph/add_instances_to_graph.py) to randomly add synthetic labeled case-instance-nodes to the graph.
 
 ### GottaGraphEmAll Pokemon Graph
-... coming soon...
+Unfortunately, we cannot provide this Pokemon graph publicly, due to unclarified licensing issues. 
+The dataset has originally been created by Mr. Joe Depeau, Senior Pre-Sales Consultant of Neo4j, who once presented it in this [Neo4j Blog post](https://neo4j.com/blog/pokegraph-gotta-graph-em-all/). \
+He kindly provided us with the dataset for our research, but it is still not clear if we are allowed to share it.
 
 ### TreeOfLife Pokemon Graph
-... coming soon...
+See  `./data/TreeOfLife/TreeOfLife.1.1.dump` **TODO: Export the dump file!!!**
 
 ### Combined Pokemon graph
-... coming soon...
+Since this database is based on the GottaGraphEmAll Pokemon Graph, we cannot provide it publicly.
 
 ## Usage
 

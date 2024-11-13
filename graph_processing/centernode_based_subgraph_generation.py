@@ -3,7 +3,7 @@ import os.path
 from tqdm import tqdm
 from neo4j import GraphDatabase
 from sys import argv
-from MINDWALC.neo4j2rdf import cypher_to_rdf
+from graph_processing.neo4j2rdf import cypher_to_rdf
 import json, yaml
 
 

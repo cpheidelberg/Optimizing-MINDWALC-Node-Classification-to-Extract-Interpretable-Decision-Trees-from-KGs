@@ -1,6 +1,6 @@
 from warnings import warn
 import sys, os
-from MINDWALC.neo4j2rdf import cypher_to_rdf
+from graph_processing.neo4j2rdf import cypher_to_rdf
 from utils.filesystem import create_new_result_folder_in
 import json
 from tqdm import tqdm
@@ -82,12 +82,6 @@ label_name_to_getter_query = {
 }
 
 '''label_name_to_getter_query = {
-    'GP3 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "GP3 mimicker"',
-    'GP4 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "GP4 mimicker"',
-    'GP5 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "GP5 mimicker"',
-}'''
-
-'''label_name_to_getter_query = {
     'morph': f'match (n:{node_instance_type}) where n:MorphologicAbnormality ',
     'not_morph': f'match (n:{node_instance_type}) where not n:MorphologicAbnormality '
 }'''
@@ -122,6 +116,7 @@ def get_splits_for_cross_val(features, labels, fold_amount=10, stratified=True):
         for train_index_list, test_index_list in folds.split(list(range(len(dataset)))):
             yield dataset.iloc[train_index_list], dataset.iloc[test_index_list]
 
+############# main ####################
 def main():
 
     # connect to neo4j dbms:
