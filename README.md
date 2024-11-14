@@ -113,18 +113,29 @@ to parse the results and plot f1 and accuracy tables.
 To run our experiments (as shown in our paper, Section 3.1, 3.2 and 3.3), you need to use [node_classification/RRR_node_classification.py](node_classification/RRR_node_classification.py). 
 
 Before starting this script, you first need to start the corresponding Neo4j graph, which you want to process. 
-(e.g. firtst start the neo4j db of the neo4j-dataset [./data/graphs/TreeOfLife_pokegraph.dump](./data/graphs/TreeOfLife_pokegraph.dump) to run tests on this db).
+(e.g. firtst start the neo4j db of the neo4j-dataset [./data/graphs/TreeOfLife_pokegraph.dump](./data/graphs/TreeOfLife_pokegraph.dump) 
+to run tests on this db).
 
-Then, configure (edit global variables in script) 
-and run the script [node_classification/RRR_node_classification.py](node_classification/RRR_node_classification.py)
-which stepwise destroys the "Instance Knowledge" by randomly removing the relations between instance-nodes and its neighbors.
+Then, create a new yaml configuration file in the folder [node_classification/configs](node_classification/configs).
+and run the script [node_classification/RRR_node_classification.py](node_classification/RRR_node_classification.py) using: 
+
+```
+python RRR_node_classification.py <password-of-running-neo4j-db> <your_config_file>.yaml
+```
+
+There are some example config files in the folder [node_classification/configs](node_classification/configs), 
+which we used for our experiments. E.g. [node_classification/configs/TreeOfLife_pokegraph.yaml](node_classification/configs/TreeOfLife_pokegraph.yaml) 
+can be used together with the neo4j db [./data/graphs/TreeOfLife_pokegraph.dump](./data/graphs/TreeOfLife_pokegraph.dump).
+
+RRR_node_classification.py stepwise destroys the "Instance Knowledge" by randomly removing the relations between instance-nodes and its neighbors.
 (Process is called "_instance knowledge degradation_", aka _RRR - Random Relation Removement_). \
-On Each destruction-step, the script will run the MINDWALC node classification algorithm (according to your configuration) 
+On Each destruction-step, the script will run the MINDWALC node classification algorithm (according to the yaml configuration file) 
 on the graph and store the results in a structured way (see console output for details).
 
 Then, to plot the same instance-knowledge degradation curves as shown in the paper, 
 configure and run the script 
-[node_classification/RRR_node_clfs_plot.py](node_classification/RRR_node_clfs_plot.py) accordingly.
+[node_classification/RRR_node_clfs_plot.py](node_classification/RRR_node_clfs_plot.py) 
+accordingly.
 
 ## Acknowledgements
 

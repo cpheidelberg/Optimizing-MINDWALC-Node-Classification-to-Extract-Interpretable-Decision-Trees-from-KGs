@@ -6,7 +6,7 @@ import numpy as np
 
 def main():
     axis_label_font_size = 12
-    dataset_num = "1"
+    dataset_num = "0"
     graph_name = "TreeOfLife_pokegraph1"
     dataset_path = f"./data/RRR_node_clf/rrr_curve_{graph_name}_{dataset_num}"
     colors = ['g', 'y', 'b', 'c', 'r', 'orange', 'k', 'm']

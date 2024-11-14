@@ -27,52 +27,6 @@ import yaml
 - There are some other scripts which can be used to generate tables and plots from the results (e.g. plot_RRR_curves.py).
 '''
 
-# load config file with yaml:
-config_file_path = "./data/RRR_node_clf/configs/PokeEvoTree.yaml"
-with open(config_file_path, 'r') as f:
-    subgraph_generation_config = yaml.safe_load(f)
-
-print(subgraph_generation_config)
-
-########### subgraph selection params ############
-node_instance_type = subgraph_generation_config['node_instance_type']
-concepts_to_disconnect = subgraph_generation_config['concepts_to_disconnect']
-relations_to_disconnect = subgraph_generation_config['relations_to_disconnect']
-node_types_to_consider = subgraph_generation_config['node_types_to_consider']
-
-########### random relation removement and graph params ###########
-relation_types_not_allowed_to_delete = subgraph_generation_config['relation_types_not_allowed_to_delete']
-random_relation_removements = subgraph_generation_config['random_relation_removements']
-rdf_predicates_to_filter_out = [rdflib.URIRef(uri) for uri in subgraph_generation_config['rdf_predicates_to_filter_out']]
-
-########### tree params ###########
-tree_vis_depth_offset = subgraph_generation_config['tree_vis_depth_offset']
-tree_vis_depth_factor = subgraph_generation_config['tree_vis_depth_factor']
-gv_file_prefix = subgraph_generation_config['gv_file_prefix']
-subgraph_name = subgraph_generation_config['subgraph_name']
-store_all_trees = subgraph_generation_config['store_all_trees']
-post_prune = subgraph_generation_config['post_prune']
-
-########### cross validation params ###########
-overwrite_output_files = subgraph_generation_config['overwrite_output_files']
-n_jobs = subgraph_generation_config['n_jobs']
-fold_amount = subgraph_generation_config['fold_amount']
-
-############ mindwalc params: ###########
-path_max_depths = subgraph_generation_config['path_max_depths']
-path_min_depths = subgraph_generation_config['path_min_depths']
-max_tree_depth = subgraph_generation_config['max_tree_depth']
-min_samples_leaf = subgraph_generation_config['min_samples_leaf']
-use_forests = subgraph_generation_config['use_forests']
-forest_size = subgraph_generation_config['forest_size']
-fixed_walking_depths = subgraph_generation_config['fixed_walking_depths']
-use_sklearn = subgraph_generation_config['use_sklearn']
-relation_tail_merging = subgraph_generation_config['relation_tail_merging']
-mute_node_properties = subgraph_generation_config['mute_node_properties']
-
-########## Pokemon labeling params #####
-# for tree of life tree:
-label_name_to_getter_query = subgraph_generation_config['label_name_to_getter_query']
 
 ############## functions #################
 from sklearn.model_selection import KFold
@@ -93,6 +47,57 @@ def get_splits_for_cross_val(features, labels, fold_amount=10, stratified=True):
 
 ############# main ####################
 def main():
+    # load config file with yaml:
+    try:
+        config_file_path = argv[2]
+    except IndexError:
+        raise ValueError("Please provide the config file path as second argument.")
+
+    with open(config_file_path, 'r') as f:
+        subgraph_generation_config = yaml.safe_load(f)
+
+    print(f"Using config file: {config_file_path}")
+
+    ########### subgraph selection params ############
+    node_instance_type = subgraph_generation_config['node_instance_type']
+    concepts_to_disconnect = subgraph_generation_config['concepts_to_disconnect']
+    relations_to_disconnect = subgraph_generation_config['relations_to_disconnect']
+    node_types_to_consider = subgraph_generation_config['node_types_to_consider']
+
+    ########### random relation removement and graph params ###########
+    relation_types_not_allowed_to_delete = subgraph_generation_config['relation_types_not_allowed_to_delete']
+    random_relation_removements = subgraph_generation_config['random_relation_removements']
+    rdf_predicates_to_filter_out = [rdflib.URIRef(uri) for uri in
+                                    subgraph_generation_config['rdf_predicates_to_filter_out']]
+
+    ########### tree params ###########
+    tree_vis_depth_offset = subgraph_generation_config['tree_vis_depth_offset']
+    tree_vis_depth_factor = subgraph_generation_config['tree_vis_depth_factor']
+    gv_file_prefix = subgraph_generation_config['gv_file_prefix']
+    subgraph_name = subgraph_generation_config['subgraph_name']
+    store_all_trees = subgraph_generation_config['store_all_trees']
+    post_prune = subgraph_generation_config['post_prune']
+
+    ########### cross validation params ###########
+    overwrite_output_files = subgraph_generation_config['overwrite_output_files']
+    n_jobs = subgraph_generation_config['n_jobs']
+    fold_amount = subgraph_generation_config['fold_amount']
+
+    ############ mindwalc params: ###########
+    path_max_depths = subgraph_generation_config['path_max_depths']
+    path_min_depths = subgraph_generation_config['path_min_depths']
+    max_tree_depth = subgraph_generation_config['max_tree_depth']
+    min_samples_leaf = subgraph_generation_config['min_samples_leaf']
+    use_forests = subgraph_generation_config['use_forests']
+    forest_size = subgraph_generation_config['forest_size']
+    fixed_walking_depths = subgraph_generation_config['fixed_walking_depths']
+    use_sklearn = subgraph_generation_config['use_sklearn']
+    relation_tail_merging = subgraph_generation_config['relation_tail_merging']
+    mute_node_properties = subgraph_generation_config['mute_node_properties']
+
+    ########## Pokemon labeling params #####
+    # for tree of life tree:
+    label_name_to_getter_query = subgraph_generation_config['label_name_to_getter_query']
 
     # connect to neo4j dbms:
     gdb_adress = 'bolt://localhost:7687'

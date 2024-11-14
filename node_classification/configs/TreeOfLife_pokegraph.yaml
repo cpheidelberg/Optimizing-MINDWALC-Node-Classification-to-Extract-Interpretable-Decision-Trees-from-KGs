@@ -51,7 +51,7 @@
   ############ mindwalc params: ###########
   # default is 8. (4 would mean: do not use background knowledge, 6=maximum +1 step into knowledge, 8=+2 steps into knowledge...)
   path_max_depths: [ 10, 10, 10], # max wakling depth
-  path_min_depths: [ 0, 0, 0], # min walking depth
+  path_min_depths: [ 1, 1, 1], # min walking depth
   min_samples_leaf: 10,  # the minimum amount of available walks required to continue to build the DT. default is 10. For our medical toy dataset, please use 20!
   use_forests: [ false, false, false], # weather to use a MINDWALC forest or MINDWALC tree.
   forest_size: [ 1, 1, 1 ], # for random forest (how many estimators/trees shall be used)

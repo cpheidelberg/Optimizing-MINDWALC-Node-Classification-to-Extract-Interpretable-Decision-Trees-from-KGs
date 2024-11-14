@@ -1,0 +1,68 @@
+# neo4j db of new neo4j dub for subgraph requirements:
+# neo4j.conf:
+# dbms.memory.heap.initial_size=4G
+# dbms.memory.heap.max_size=4G
+# dbms.unmanaged_extension_classes=n10s.endpoint=/rdf
+
+# for what is this config file?
+# To run the script node_classification/RRR_node_classification.py, you need to provide a config file like this one.
+# This is how RRR_node_classification.py works:
+# - Selects a subgraph from a running neo4j graph database e.g. by filtering out some node- and relation-types.
+# - Then we can step wise destroy the "Instance knowledge" by randomly removing the relations between instance-nodes and its neighbors.
+# - We call this process Random Relation Removement (RRR) and we apply it step wise to destroy more and more percentage (e.g. [0%, 10%, 20%, ...90%]).
+# - On each RRR-level, we train different configured mindwalc classifiers and evaluate them with k-fold cross validation.
+# - There are some other scripts which can be used to generate tables and plots from the results (e.g. plot_RRR_curves.py).
+
+{
+  ########### subgraph selection params ############
+  node_instance_type: "ProstateInstance", # The node-type of the instances which should be classified.
+  concepts_to_disconnect: [ ], # list of node-ids to disconnect from the subgraph.
+  relations_to_disconnect: [ ], # list of relation-types to disconnect from the subgraph. e.g. ["HAS_TYPE", "AGAINST"]
+  node_types_to_consider: [ 'ObjectConcept' ],  # All other node-types will be excluded, except the instance nodes, obviously.
+
+  ########## Instance node labeling #####
+  # => IMPORTANT: instance nodes needs to be addressed with variable name n!
+  label_name_to_getter_query: {
+    'adenocarcinoma (GP3-5)':
+      'match (n: ProstateInstance) where n.prostate_label = "adenocarcinoma"',
+    'GP3 mimicker':
+      'match (n: ProstateInstance) where n.prostate_label = "pattern 3 mimicker case"',
+    'GP4 mimicker':
+      'match (n: ProstateInstance) where n.prostate_label = "pattern 4 mimicker case"',
+    'GP5 mimicker':
+      'match (n: ProstateInstance) where n.prostate_label = "pattern 5 mimicker case"',
+
+  },
+
+  ########### random relation removement and graph params ###########
+  relation_types_not_allowed_to_delete: [ ], #["BELONGS_TO_GROUP"]
+  random_relation_removements: [ 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9 ], # the percentage of relations which should be removed from the graph. e.g. [ 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9 ]
+  rdf_predicates_to_filter_out: [ "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" ], # In our use case we dont want to allow the rdf:type predicate to be used for classification.
+
+  ########### cross validation and logging ###########
+  overwrite_output_files: false,
+  n_jobs: -1, # -1 means: use all available cores
+  fold_amount: 10,
+  subgraph_name: "prostate_subgraph_p3", # the name of the subgraph which is selected for the classification. Outputfolder will be named after this name.
+  store_all_trees: true, # if true, all trees will be stored in the output folder
+
+  ########### tree params ###########
+  gv_file_prefix: 'neo4j://graph.individuals#', # leaf this untouched. This is the prefix for the nodes in the decision tree.
+  post_prune: true, # weather to post prune the decision tree or not
+  max_tree_depth: 3,  # essential to reduce computational complexity and visual complexity of generated DT. Default is None
+  # for decision tree visualization:
+  tree_vis_depth_offset: 0, #
+  tree_vis_depth_factor: 1.0, #0.5 can make sence if RTM is not used (then, relation-count is subtracted)
+
+  ############ mindwalc params: ###########
+  # default is 8. (4 would mean: do not use background knowledge, 6=maximum +1 step into knowledge, 8=+2 steps into knowledge...)
+  path_max_depths: [10, 10, 10, 10, 10, 10], # max wakling depth
+  path_min_depths: [0, 0, 0, 0, 0, 0], # min walking depth
+  min_samples_leaf: 20,  # the minimum amount of available walks required to continue to build the DT. default is 10. For our medical toy dataset, please use 20!
+  use_forests: [ false, false, false, false, false, false], # weather to use a MINDWALC forest or MINDWALC tree.
+  forest_size: [ 1, 1, 1, 1, 1, 1 ], # for random forest (how many estimators/trees shall be used)
+  fixed_walking_depths: [ true, true, false, false, null, null ], # true=use fixed walking depth, false=use flexible walking depth, None=use combined walking depth
+  use_sklearn: [ false, false, false, false, false, false], # if true, a MINDWALC transformer will be used together with an sklearn decision tree or random forest (depends on the value of parameter "use_forests").
+  relation_tail_merging: [ false, true, false, true, false, true], # if true, the relation tail merging (RTM) will be used.
+  mute_node_properties: true # if true, the node properties will not be used as features for the classifier.
+}
