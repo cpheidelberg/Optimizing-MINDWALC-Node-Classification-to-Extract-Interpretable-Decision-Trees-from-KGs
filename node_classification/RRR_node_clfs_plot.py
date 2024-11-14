@@ -6,32 +6,27 @@ import numpy as np
 
 def main():
     axis_label_font_size = 12
-    dataset_num = "4"
-    graph_name = "prostate_subgraph_p3"  # Current oprions: PokeReport, MergedPokemon, HierarchicalPokemon
+    dataset_num = "1"
+    graph_name = "TreeOfLife_pokegraph1"
     dataset_path = f"./data/RRR_node_clf/rrr_curve_{graph_name}_{dataset_num}"
     colors = ['g', 'y', 'b', 'c', 'r', 'orange', 'k', 'm']
-
     hide_x = False
 
-
-    in_labels = ["Flexible walk", "Flexible walk with RTM",
-                 "Combined walk", "Combined walk with RTM",
-                 "Fixed walk", "Fixed walk with RTM"]
-    in_tables = [f"{dataset_path}/FlexWalcDepth0-10_DT_means.xlsx",
-                 f"{dataset_path}/FlexWalcDepth0-10_DT_RTM_means.xlsx",
-                 f"{dataset_path}/CombWalcDepth0-10_DT_means.xlsx",
-                 f"{dataset_path}/CombWalcDepth0-10_DT_RTM_means.xlsx",
-                 f"{dataset_path}/FixWalcDepth0-10_DT_means.xlsx",
-                 f"{dataset_path}/FixWalcDepth0-10_DT_RTM_means.xlsx"
-                 ]
+    '''configuration_label_to_table = {
+        "Flexible walk": f"{dataset_path}/FlexWalcDepth0-10_DT_means.xlsx",
+        "Flexible walk with RTM": f"{dataset_path}/FlexWalcDepth0-10_DT_RTM_means.xlsx",
+        "Combined walk": f"{dataset_path}/CombWalcDepth0-10_DT_means.xlsx",
+        "Combined walk with RTM": f"{dataset_path}/CombWalcDepth0-10_DT_RTM_means.xlsx",
+        "Fixed walk": f"{dataset_path}/FixWalcDepth0-10_DT_means.xlsx",
+        "Fixed walk with RTM": f"{dataset_path}/FixWalcDepth0-10_DT_RTM_means.xlsx
+    }
+    in_labels = list(configuration_label_to_table.keys())
+    in_tables = list(configuration_label_to_table.values())'''
 
 
     # collection all .xlsx files in the directory:
-    #in_tables = [f"{dataset_path}/{f}" for f in os.listdir(dataset_path) if f.endswith(".xlsx")]
-    #in_labels = [f.split("/")[-1].replace(".xlsx", "") for f in in_tables]
-
-    #in_labels = ["Frequency based DT", "MINDWALC DT"]
-    #in_labels = ["Flexible walking depth", "Combined walking depth", "Fixed walking depth"]
+    in_tables = [f"{dataset_path}/{f}" for f in os.listdir(dataset_path) if f.endswith(".xlsx")]
+    in_labels = [f.split("/")[-1].replace(".xlsx", "") for f in in_tables]
 
     ###### plot f1-test curve ######
     for i, in_table in enumerate(in_tables):
@@ -220,6 +215,8 @@ def main():
         # plt.show()
     plt.grid()
     plt.savefig(f"{dataset_path}/walkd_depth_vs_feature_destruction.png", dpi=300)
+
+    print(f"All plots saved in {dataset_path} as .png files.")
 
     return 0
 

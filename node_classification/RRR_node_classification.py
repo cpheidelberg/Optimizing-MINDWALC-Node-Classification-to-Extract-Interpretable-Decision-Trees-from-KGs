@@ -16,6 +16,7 @@ from sklearn import tree as sktree
 import graphviz
 from neo4j import GraphDatabase
 from sys import argv
+import yaml
 
 ''' 
 ### What this script does: ###
@@ -26,78 +27,52 @@ from sys import argv
 - There are some other scripts which can be used to generate tables and plots from the results (e.g. plot_RRR_curves.py).
 '''
 
-#### subgraph  params: ###############
-node_instance_type = "ProstateInstance"#"PokeReport" #"ProstateCenterNode", #"Instance" # match (a) where NOT a.prostate_label IS NULL set a:ProstateInstance
-# exclude some concepts (nodes) and relations (we exclude some specific nodes/rels to make the clf-task harder):
-NORMAL_VULNERABILITY_AGAINST_concepts = ["1989", "1990", "1991", "1992", "1993", "1994", "1995", "1996", "1997", "1998",
-                                         "1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006"]
-fire_water_grass_concepts = ['263', '266', '274']
-all_poketype_node_ids = ['261', '262' ,'263', '264', '265', '266', '267', '268', '269',
-                         '270', '271', '272', '273', '274', '275', '276', '277', '278']
-concepts_to_disconnect = []#fire_water_grass_concepts + NORMAL_VULNERABILITY_AGAINST_concepts
-#relations_to_disconnect = ["HAS_TYPE", "AGAINST"]  # "FROM" connects pokemon with generation node
-relations_to_disconnect = []#["CAN_MIMICK"]
-node_types_to_consider = ['ObjectConcept']  # allow all concept-types, containing also the exposed ModType concepts
+# load config file with yaml:
+config_file_path = "./data/RRR_node_clf/configs/PokeEvoTree.yaml"
+with open(config_file_path, 'r') as f:
+    subgraph_generation_config = yaml.safe_load(f)
 
-########### random relation removement and graph params ###############
-relation_types_not_allowed_to_delete = [] #["BELONGS_TO_GROUP"]
-rrr_max = 0.9  # 0.9 0.1
-rrr_start = 0.0
-step_count = 10
-rdf_predicates_to_filter_out = [rdflib.URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")] # In our use case we dont want to allow the rdf:type predicate to be used for classification.
+print(subgraph_generation_config)
 
-########### tree params ###############
-# for decision tree visualization:
-tree_vis_depth_offset = 0#-2
-tree_vis_depth_factor = 1.0#0.5
-gv_file_prefix = 'neo4j://graph.individuals#'
-subgraph_name = "prostate_subgraph_p3" #f'{node_instance_type.lower()}_subgraph'
-store_all_trees = True
+########### subgraph selection params ############
+node_instance_type = subgraph_generation_config['node_instance_type']
+concepts_to_disconnect = subgraph_generation_config['concepts_to_disconnect']
+relations_to_disconnect = subgraph_generation_config['relations_to_disconnect']
+node_types_to_consider = subgraph_generation_config['node_types_to_consider']
 
-overwrite_output_files = False
-n_jobs = 1
-post_prune = True
-fold_amount = 10
+########### random relation removement and graph params ###########
+relation_types_not_allowed_to_delete = subgraph_generation_config['relation_types_not_allowed_to_delete']
+random_relation_removements = subgraph_generation_config['random_relation_removements']
+rdf_predicates_to_filter_out = [rdflib.URIRef(uri) for uri in subgraph_generation_config['rdf_predicates_to_filter_out']]
 
-# mindwalc params:
-# default is 8. (4 would mean: do not use background knowledge, 6=maximum +1 step into knowledge, 8=+2 steps into knowledge...)
-path_max_depths = [10, 10, 10, 10, 10, 10]
-path_min_depths = [0, 0, 0, 0, 0, 0]
-max_tree_depth = 3  # default is None
-min_samples_leaf = 20  # the minimum amount of available walks required to continue to build the DT. default is 10.
-use_forests = [False, False, False, False, False, False]
-forest_size = [1, 1, 1, 1, 1, 1, 1, 1] # for random forest (how many estimators/trees shall be used)
-fixed_walking_depths = [True, True, False, False, None, None]
-use_sklearn = [False, False, False, False, False, False]
-relation_tail_merging = [False, True, False, True, False, True]
+########### tree params ###########
+tree_vis_depth_offset = subgraph_generation_config['tree_vis_depth_offset']
+tree_vis_depth_factor = subgraph_generation_config['tree_vis_depth_factor']
+gv_file_prefix = subgraph_generation_config['gv_file_prefix']
+subgraph_name = subgraph_generation_config['subgraph_name']
+store_all_trees = subgraph_generation_config['store_all_trees']
+post_prune = subgraph_generation_config['post_prune']
 
-########## Pokemon labeling setup #####
+########### cross validation params ###########
+overwrite_output_files = subgraph_generation_config['overwrite_output_files']
+n_jobs = subgraph_generation_config['n_jobs']
+fold_amount = subgraph_generation_config['fold_amount']
 
-# for gotta graph em all graph & joined:
-label_name_to_getter_query = {
-    'adenocarcinoma (GP3-5)': f'match (n:{node_instance_type}) where n.prostate_label = "adenocarcinoma"',
-    'GP3 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "pattern 3 mimicker case"',
-    'GP4 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "pattern 4 mimicker case"',
-    'GP5 mimicker': f'match (n:{node_instance_type}) where n.prostate_label = "pattern 5 mimicker case"',
-}
+############ mindwalc params: ###########
+path_max_depths = subgraph_generation_config['path_max_depths']
+path_min_depths = subgraph_generation_config['path_min_depths']
+max_tree_depth = subgraph_generation_config['max_tree_depth']
+min_samples_leaf = subgraph_generation_config['min_samples_leaf']
+use_forests = subgraph_generation_config['use_forests']
+forest_size = subgraph_generation_config['forest_size']
+fixed_walking_depths = subgraph_generation_config['fixed_walking_depths']
+use_sklearn = subgraph_generation_config['use_sklearn']
+relation_tail_merging = subgraph_generation_config['relation_tail_merging']
+mute_node_properties = subgraph_generation_config['mute_node_properties']
 
-'''label_name_to_getter_query = {
-    'morph': f'match (n:{node_instance_type}) where n:MorphologicAbnormality ',
-    'not_morph': f'match (n:{node_instance_type}) where not n:MorphologicAbnormality '
-}'''
-
-'''label_name_to_getter_query = {
-    'fire': f'match (n:{node_instance_type})-->(m:Context) where m.type2 is NULL and m.type1 = "fire"',
-    'grass': f'match (n:{node_instance_type})-->(m:Context) where m.type2 is NULL and m.type1 = "grass" ',
-    'water': f'match (n:{node_instance_type})-->(m:Context) where m.type2 is NULL and m.type1 = "water" '
-}'''
-
+########## Pokemon labeling params #####
 # for tree of life tree:
-'''label_name_to_getter_query = {
-    'fire': f'match (n:{nodes_to_classify})-->(m:Context) WHERE size(m.types) = 1 and m.types[0] = "Fire" ',
-    'grass': f'match (n:{nodes_to_classify})-->(m:Context) WHERE size(m.types) = 1 and m.types[0] = "Grass" ',
-    'water': f'match (n:{nodes_to_classify})-->(m:Context) WHERE size(m.types) = 1 and m.types[0] = "Water"  '
-}'''
+label_name_to_getter_query = subgraph_generation_config['label_name_to_getter_query']
 
 ############## functions #################
 from sklearn.model_selection import KFold
@@ -129,7 +104,7 @@ def main():
     driver = GraphDatabase.driver(gdb_adress, auth=auth)
     session = driver.session(database="neo4j")
 
-    random_relation_removements = [round(x, 2) for x in np.linspace(rrr_start, rrr_max, step_count)]
+    #random_relation_removements = [round(x, 2) for x in np.linspace(rrr_start, rrr_max, step_count)]
 
     print(f"random_relation_removements: {random_relation_removements}")
 
@@ -241,8 +216,10 @@ def main():
         cypher_to_rdf(report_subgraph_query, rdf_subgraph_file, addr, auth)
         g = rdflib.Graph()
         g.parse(rdf_subgraph_file, format='text/n3')
-        kg_non_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=False, label_predicates=rdf_predicates_to_filter_out)
-        kg_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=True, label_predicates=rdf_predicates_to_filter_out)
+        kg_non_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=False, label_predicates=rdf_predicates_to_filter_out,
+                                           skip_literals=mute_node_properties)
+        kg_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=True, label_predicates=rdf_predicates_to_filter_out,
+                                       skip_literals=mute_node_properties)
 
         # create and clean training data: Remove each report which does not appear in our graph:
         traintest_ents = []
@@ -260,7 +237,8 @@ def main():
             print(f"List of sorted out ents: {ents_sorted_out}")
 
         if len(traintest_ents) == 0:
-            warn(f"ERROR: Could not find any training data points in the knowledge graph '{rdf_subgraph_file}'.")
+            warn(f"ERROR: Could not find any training data points in the knowledge graph '{rdf_subgraph_file}' "
+                 f"using querie:\n{label_name_to_getter_query}")
             continue
         else:
             print(f"Found {len(traintest_ents)} training data points.", flush=True)
@@ -524,6 +502,7 @@ def main():
                     "relations_to_disconnect": relations_to_disconnect,
                     "concepts_to_disconnect": concepts_to_disconnect,
                     "relation_tail_merging": relation_tail_merge,
+                    "mute_node_properties": mute_node_properties
                 }, indent=4))
 
     return 0
