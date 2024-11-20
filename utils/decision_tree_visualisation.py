@@ -116,7 +116,7 @@ def tree_visualisation_postprocessor(in_gv_file_path, neo4j_url="neo4j://localho
                     if len(depth) == 2:
                         depth_str = " - ".join([str(int((d + depth_offset)*depth_factor)) for d in depth])
                     elif len(depth) == 3:
-                        depth_str = " - ".join([str(int((d + depth_offset)*depth_factor)) for d in depth[:2]]) + f" ({depth[2]})"
+                        depth_str = " - ".join([str(int((d + depth_offset)*depth_factor)) for d in depth[:2]]) + f" ({(depth[2] + depth_offset)*depth_factor})"
                     depth = depth_str
                 else:
                     depth = int((depth + depth_offset) * depth_factor)

@@ -118,6 +118,10 @@ def main():
 
     print(f"saving results to {result_path_root}")
 
+    # store the config file:
+    with open(result_path_root + "/config.yaml", 'w') as f:
+        f.write(yaml.dump(subgraph_generation_config))
+
     mean_values = {}
 
     for random_relation_removement in tqdm(random_relation_removements): #####for each random relation removement value
