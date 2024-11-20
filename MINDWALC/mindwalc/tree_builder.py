@@ -93,7 +93,9 @@ class MINDWALCMixin():
 
     def _mine_walks(self, neighborhoods, labels, n_walks=1, sample_frac=None,
                     useless=None, fixed_walc_depth=True):
-        """Mine the top-`n_walks` walks that have maximal information gain."""
+        """Mine the top-`n_walks` walks that have maximal information gain.
+        returns walks in shape (vertex, depth) with depth = int, for fixed walk or (int, int) for flexible walk.
+        If depth = (int, int, int), this means that the flexible and the fixed walk to this vertex have same info gain."""
 
         if type(fixed_walc_depth) is bool:
             walk_iterator = self._generate_candidates(neighborhoods,
@@ -152,9 +154,11 @@ class MINDWALCMixin():
                                 best_depth = depth
                                 top_walk = (vertex, depth)
                         elif best_depth_is_fix and not depth_is_fix:
+                            # this tuple of len 3 communicates that the flexible and the fixed walk to this vertex have same info gain
                             best_depth = (depth[0], depth[1], best_depth)
                             top_walk = (vertex, best_depth)
                         elif not best_depth_is_fix and depth_is_fix:
+                            # this tuple of len 3 communicates that the flexible and the fixed walk to this vertex have same info gain
                             best_depth = (best_depth[0], best_depth[1], depth)
                             top_walk = (vertex, best_depth)
                         else: # both are flexible

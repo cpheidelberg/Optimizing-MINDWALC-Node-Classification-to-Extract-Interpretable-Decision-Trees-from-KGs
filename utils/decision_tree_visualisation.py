@@ -1,6 +1,6 @@
 import re
 from neo4j import GraphDatabase
-import argparse
+from sys import argv
 import sys, os
 
 ########## params ###########
@@ -113,7 +113,10 @@ def tree_visualisation_postprocessor(in_gv_file_path, neo4j_url="neo4j://localho
 
             if depth is not None:
                 if type(depth) == list:
-                    depth_str = " - ".join([str(int((d + depth_offset)*depth_factor)) for d in depth])
+                    if len(depth) == 2:
+                        depth_str = " - ".join([str(int((d + depth_offset)*depth_factor)) for d in depth])
+                    elif len(depth) == 3:
+                        depth_str = " - ".join([str(int((d + depth_offset)*depth_factor)) for d in depth[:2]]) + f" ({depth[2]})"
                     depth = depth_str
                 else:
                     depth = int((depth + depth_offset) * depth_factor)
@@ -181,24 +184,17 @@ def tree_visualisation_postprocessor(in_gv_file_path, neo4j_url="neo4j://localho
 def main():
 
     # parse arguments:
-    sys.path.append(os.getcwd())
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--neo4j_db_adress_user_pw",
-                        default='neo4j://localhost:7687 neo4j password')
-    args = parser.parse_args()
-    neo4j_db = args.neo4j_db_adress_user_pw.split(' ')
-    if len(neo4j_db) != 3:
-        print("Wrong value for argument --neo4j_db_adress_user_pw ")
-        print(
-            "Please pass address, username and password for --neo4j_db_adress_user_pw separated with space like that:")
-        print("--neo4j_db_adress_user_pw \"neo4j://ipaddress:port username password\"")
-        exit(1)
-    url = neo4j_db[0]
-    auth = (neo4j_db[1], neo4j_db[2])
+    try:
+        auth = ("neo4j", argv[1])
+        url = "neo4j://localhost:7687"
+    except IndexError:
+        raise ValueError("Please provide neo4j db password as first argument.")
 
-    for tree_to_posprocess in [f"data/tree_clf_performance/kg_curve_PokeReport_8/RRR_0.2/FixWalcDepth4-4_DT/trees/example_tree{i}.gv" for i in range(10)]:
-        print(f"processing tree {os.path.basename(tree_to_posprocess)} in {os.path.dirname(tree_to_posprocess)}...")
-        tree_visualisation_postprocessor(tree_to_posprocess, url, auth, neo4j_attribute_to_display_in_tree, depth_factor=0.5, depth_offset=-2, show_data_distribution_in_tree=False)
+    base_path = "data/RRR_node_clf/rrr_curve_IgaAmyReports_2/RRR_0.0/CombWalcDepth1-10_DT/trees"
+
+    for tree_to_posprocess in [f"{base_path}/example_tree{i}.gv" for i in range(10)]:
+        print(f"processing tree  {tree_to_posprocess}")
+        tree_visualisation_postprocessor(tree_to_posprocess, url, auth, neo4j_attribute_to_display_in_tree, depth_factor=1, depth_offset=0, show_data_distribution_in_tree=True)
 
     return 0
 

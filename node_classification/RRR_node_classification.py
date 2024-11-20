@@ -275,9 +275,14 @@ def main():
             f.write(meta_info)
 
         # generate cross validation dataset:
-        cross_val_data_set = [(x[0], x[1]) for x in get_splits_for_cross_val(traintest_ents, traintest_labels,
+        if not fold_amount is None:
+            cross_val_data_set = [(x[0], x[1]) for x in get_splits_for_cross_val(traintest_ents, traintest_labels,
                                  fold_amount=fold_amount,
                                  stratified=True)]
+        else:
+            cross_val_data_set = [(pd.DataFrame({"feature": traintest_ents, "label": traintest_labels}),
+                                   pd.DataFrame({"feature": traintest_ents, "label": traintest_labels}))]
+            print("WARNING: No cross validation performed, because fold_amount is None.")
 
         for setting_id in range(len(path_max_depths)): #################### for each setting:
             path_max_depth = path_max_depths[setting_id]
