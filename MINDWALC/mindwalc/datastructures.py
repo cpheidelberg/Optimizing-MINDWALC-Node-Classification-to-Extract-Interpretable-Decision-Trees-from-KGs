@@ -221,7 +221,8 @@ class Graph(object):
         driver.close()
 
     @staticmethod
-    def rdflib_to_graph(rdflib_g, label_predicates=[], relation_tail_merging=False, skip_literals=False):
+    def rdflib_to_graph(rdflib_g, label_predicates=[], relation_tail_merging=False, skip_literals=False,
+                        skip_nodes_with_prefix=[]):
         '''
         Converts an rdflib graph to a Graph object.
         During the conversion, a multi-relation graph (head)-[relation]->(tail) (aka subject, predicate, object)is converted to a non-relational graph.
@@ -239,6 +240,7 @@ class Graph(object):
         named accordingly in the form <type_of_r>_<name_of_t>.
         :param skip_literals: If True, literals (=node properties/attributes) are skipped during the conversion.
         Otherwise, they are converted to nodes. so that a node (n: {name: 'John'}) becomes (n)-->(name)-->(john).
+        :param skip_nodes_with_prefix: A list of prefixes that are used to skip nodes with that prefix.
         :return: A Graph object of type datastructures::Graph
         '''
 
@@ -248,6 +250,12 @@ class Graph(object):
             if p not in label_predicates:
 
                 if skip_literals and (isinstance(o, rdflib.term.Literal) or isinstance(s, rdflib.term.Literal)):
+                    continue
+
+                if any([str(s).startswith(prefix) for prefix in skip_nodes_with_prefix]):
+                    continue
+
+                if any([str(o).startswith(prefix) for prefix in skip_nodes_with_prefix]):
                     continue
 
                 # Literals are attribute values in RDF, for instance, a person’s name, the date of birth, height, etc.
@@ -426,10 +434,10 @@ class Tree():
             node_props_dot = str([f'{k}="{node_render_props[k]}"' for k in node_render_props.keys()]).replace("'", '')
             s = f'Node{str(num)} ' + node_props_dot + ';\n'
             s += self.left._convert_node_to_dot(node_vis_props)
-            s += 'Node' + str(num) + ' -> ' + 'Node' + str(num + 1) + ' [label="false"];\n'
+            s += 'Node' + str(num) + ' -> ' + 'Node' + str(num + 1) + ' [label="not found"];\n'
             amount_subnodes_left = self.left.node_count
             s += self.right._convert_node_to_dot(node_vis_props)
-            s += 'Node' + str(num) + ' -> ' + 'Node' + str(num + amount_subnodes_left + 1) + ' [label="true"];\n'
+            s += 'Node' + str(num) + ' -> ' + 'Node' + str(num + amount_subnodes_left + 1) + ' [label="found"];\n'
 
         return s
 

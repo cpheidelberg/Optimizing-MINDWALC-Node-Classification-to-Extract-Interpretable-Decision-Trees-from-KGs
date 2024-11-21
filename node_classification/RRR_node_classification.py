@@ -69,6 +69,7 @@ def main():
     random_relation_removements = subgraph_generation_config['random_relation_removements']
     rdf_predicates_to_filter_out = [rdflib.URIRef(uri) for uri in
                                     subgraph_generation_config['rdf_predicates_to_filter_out']]
+    skip_nodes_with_prefix = subgraph_generation_config['skip_nodes_with_prefix'] if 'skip_nodes_with_prefix' in subgraph_generation_config.keys() else []
 
     ########### tree params ###########
     tree_vis_depth_offset = subgraph_generation_config['tree_vis_depth_offset']
@@ -130,22 +131,27 @@ def main():
         session.run(f"match (n) remove n.{subgraph_name}")
         session.run(f"match ()-[r]-() remove r.{subgraph_name}")
 
+        all_node_types = "(n:" + " or n:".join(node_types_to_consider) + ")"
+
+        # select all nodes:
         for node_type_to_consider in node_types_to_consider:
-
-            # select whole graph:
             session.run(f"match (n:{node_type_to_consider}) set n.{subgraph_name} = true") # for now, select whole graph as subgraph
-            session.run(f"match (:{node_type_to_consider})-[r]-(:{node_type_to_consider}) set r.{subgraph_name} = true") # for now, select whole graph as subgraph
 
-            # select the instances and the instance knowledge:
-            session.run(f"match (n:{node_instance_type})-[r]-(t:{node_type_to_consider}) set n.{subgraph_name} = true, t.{subgraph_name} = true, r.{subgraph_name} = true")
+        # select all relations between selected nodes:
+        session.run(f"match (a)-[r]-(b) where a.{subgraph_name} and b.{subgraph_name} set r.{subgraph_name} = true")
 
-            # remove specific relation-types from selection:
-            for relation_type in relations_to_disconnect:
-                session.run(f"match (:{node_type_to_consider})-[r:{relation_type}]-(:{node_type_to_consider}) set r.{subgraph_name} = false")
+        # select the instances and the instance knowledge:
+        for node_type_to_consider in node_types_to_consider:
+            session.run(f"match (n:{node_instance_type})-[r]-(t:{node_type_to_consider}) set n.{subgraph_name} = true, r.{subgraph_name} = true")
 
-            # remove specific concepts from selection:
+        # remove specific concepts from selection:
+        for node_type_to_consider in node_types_to_consider:
             for concept_id in concepts_to_disconnect:
                 session.run(f"match (n:{node_type_to_consider}) where ID(n) = {concept_id} set n.{subgraph_name} = false")
+
+        # remove specific relation-types from selection:
+        for relation_type in relations_to_disconnect:
+            session.run(f"match (a)-[r:{relation_type}]-(b) set r.{subgraph_name} = false")
 
         #create_report_subgraph(...)
         # remove random relations:
@@ -226,9 +232,9 @@ def main():
         g = rdflib.Graph()
         g.parse(rdf_subgraph_file, format='text/n3')
         kg_non_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=False, label_predicates=rdf_predicates_to_filter_out,
-                                           skip_literals=mute_node_properties)
+                                           skip_literals=mute_node_properties, skip_nodes_with_prefix=skip_nodes_with_prefix)
         kg_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=True, label_predicates=rdf_predicates_to_filter_out,
-                                       skip_literals=mute_node_properties)
+                                       skip_literals=mute_node_properties, skip_nodes_with_prefix=skip_nodes_with_prefix)
 
         # create and clean training data: Remove each report which does not appear in our graph:
         traintest_ents = []
