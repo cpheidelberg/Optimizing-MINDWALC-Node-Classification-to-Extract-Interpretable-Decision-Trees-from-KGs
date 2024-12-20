@@ -122,14 +122,14 @@ class Graph(object):
 
                     nx_graph.add_edge(name_v, name_b)
 
-        plt.figure(figsize=figsize)
+        fig = plt.figure(figsize=figsize)
         _pos = nx.circular_layout(nx_graph)
         nx.draw_networkx_nodes(nx_graph, pos=_pos)
         nx.draw_networkx_edges(nx_graph, pos=_pos)
         nx.draw_networkx_labels(nx_graph, pos=_pos)
         nx.draw_networkx_edge_labels(nx_graph, pos=_pos,
                                      edge_labels=nx.get_edge_attributes(nx_graph, 'name'))
-        plt.show()
+        return fig
 
     def extract_neighborhood(self, instance, depth=8):
         neighborhood = Neighborhood()
@@ -574,16 +574,32 @@ class Tree():
 
 if __name__ == '__main__': # TODO: add this example to the MINDWALC repo?
 
+    use_predicate_nodes_as_edges = False
+    d = 4
+
     # create simple example graph:
+    '''
+    this example-graph looks like this tree:
+    # A
+    # ├── B (predicate=use_predicate_nodes_as_edges)
+    # │   ├── D
+    # │   │   └── G (predicate=use_predicate_nodes_as_edges)
+    # │   │       └── ↺ (back to A)
+    # │   └── E
+    # ├── C (predicate=use_predicate_nodes_as_edges)
+    # │   └── ↳ (to E)
+    # └── F (predicate=use_predicate_nodes_as_edges)
+
+    '''
     g = Graph()
     start_node = Vertex('A')
     g.add_vertex(start_node)
-    g.add_vertex(Vertex('B', predicate=True))
-    g.add_vertex(Vertex('C', predicate=True))
+    g.add_vertex(Vertex('B', predicate=use_predicate_nodes_as_edges))
+    g.add_vertex(Vertex('C', predicate=use_predicate_nodes_as_edges))
     g.add_vertex(Vertex('D'))
     target_node = Vertex('E')
     g.add_vertex(target_node)
-    g.add_vertex(Vertex('F', predicate=True))
+    g.add_vertex(Vertex('F', predicate=use_predicate_nodes_as_edges))
     g.add_edge(g.name_to_vertex['A'], g.name_to_vertex['B'])
     g.add_edge(g.name_to_vertex['A'], g.name_to_vertex['C'])
     g.add_edge(g.name_to_vertex['A'], g.name_to_vertex['F'])
@@ -591,13 +607,28 @@ if __name__ == '__main__': # TODO: add this example to the MINDWALC repo?
     g.add_edge(g.name_to_vertex['B'], g.name_to_vertex['E'])
     g.add_edge(g.name_to_vertex['C'], g.name_to_vertex['E'])
 
+    # this does create a loop in the graph, which is NOT recommended for the path extraction:
+    g.add_vertex(Vertex('G', predicate=use_predicate_nodes_as_edges))
+    g.add_edge(g.name_to_vertex['D'], g.name_to_vertex['G'])
+    g.add_edge(g.name_to_vertex['G'], g.name_to_vertex['A'])
+
     # visualize the graph:
-    g.visualise()
+    fig = g.visualise(draw_predicate_nodes_as_edges=False)
+    fig.suptitle('Graph Visualization')
+    fig.show()
 
-    d = 1
 
+    # print the paths in terminal and visualize them as one graph:
+    g_paths = Graph()
     for p in g.extract_paths('A', d):
         print([v.name for v in p])
+        for i, v in enumerate(p):
+            g_paths.add_vertex(v)
+            if i > 0:
+                g_paths.add_edge(p[i - 1], v)
+    fig = g_paths.visualise(draw_predicate_nodes_as_edges=False)
+    fig.suptitle('Paths Visualization')
+    fig.show()
 
     print()
 
