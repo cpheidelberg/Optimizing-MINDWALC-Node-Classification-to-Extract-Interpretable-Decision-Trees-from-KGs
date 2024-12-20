@@ -80,23 +80,47 @@ class Graph(object):
     def get_neighbors(self, vertex):
         return self.transition_matrix[vertex]
 
-    def visualise(self, figsize=(10, 10)):
+    def visualise(self, figsize=(10, 10), draw_predicate_nodes_as_edges=False): # TODO: push this change to MINMDWALC repo!
         nx_graph = nx.DiGraph()
 
-        for v in self.vertices:
-            if not v.predicate:
+        if draw_predicate_nodes_as_edges:
+            for v in self.vertices:
+                if not v.predicate:
+                    name = v.name.split('/')[-1]
+                    nx_graph.add_node(name, name=name, pred=v.predicate)
+
+            for v in tqdm(self.vertices):
+                if not v.predicate:
+                    v_name = v.name.split('/')[-1]
+                    # Neighbors are predicates
+                    for pred in self.get_neighbors(v):
+                        pred_name = pred.name.split('/')[-1]
+                        for obj in self.get_neighbors(pred):
+                            obj_name = obj.name.split('/')[-1]
+                            nx_graph.add_edge(v_name, obj_name, name=pred_name)
+        else:
+            for v in self.vertices:
                 name = v.name.split('/')[-1]
+                if v.predicate:
+                    name += "\n(P)"
+                elif v.relation_modified:
+                    name += "\n(RTM)"
                 nx_graph.add_node(name, name=name, pred=v.predicate)
 
-        for v in tqdm(self.vertices):
-            if not v.predicate:
-                v_name = v.name.split('/')[-1]
-                # Neighbors are predicates
-                for pred in self.get_neighbors(v):
-                    pred_name = pred.name.split('/')[-1]
-                    for obj in self.get_neighbors(pred):
-                        obj_name = obj.name.split('/')[-1]
-                        nx_graph.add_edge(v_name, obj_name, name=pred_name)
+            for v in tqdm(self.vertices):
+                name_v = v.name.split('/')[-1]
+                if v.predicate:
+                    name_v += "\n(P)"
+                elif v.relation_modified:
+                    name_v += "\n(RTM)"
+                for neighbor in self.get_neighbors(v):
+                    name_b = neighbor.name.split('/')[-1]
+                    if neighbor.predicate:
+                        name_b += "\n(P)"
+                    elif neighbor.relation_modified:
+                        name_b += "\n(RTM)"
+
+                    nx_graph.add_edge(name_v, name_b)
 
         plt.figure(figsize=figsize)
         _pos = nx.circular_layout(nx_graph)
@@ -122,6 +146,40 @@ class Graph(object):
             to_explore = new_explore
 
         return neighborhood
+
+    def extract_paths(self, instance, depth):
+
+        assert depth > 0, "Depth must be greater than 0."
+        root = self.name_to_vertex[str(instance)]
+        to_explore = {root}
+        paths = [[root]]
+
+        print (f"added path: {[n.name for n in paths[0]]} to paths")
+
+        for d in range(depth + 1):
+            new_explore = set()
+            pref_paths = [] + paths
+            for v in list(to_explore):
+                for pref_path in pref_paths:
+                    pref_path_ent_neighborhood = self.get_neighbors(pref_path[-1])
+                    #print(f"Neighbors of {pref_path[-1].name}: {[n.name for n in pref_path_ent_neighborhood]}")
+                    is_v_in_neighbors_of_pref_path_end = sum(1 if n == v else 0 for n in pref_path_ent_neighborhood)
+                    if  is_v_in_neighbors_of_pref_path_end > 0:
+                        paths.append(pref_path + [v])
+                        #print(f"added path: {[n.name for n in pref_path + [v]]} to paths")
+                        #print(f"{v.name} is in the neighbors of {pref_path[-1].name} (which is end of path {[n.name for n in pref_path]})")
+
+                for neighbor in self.get_neighbors(v):
+                    new_explore.add(neighbor)
+            to_explore = new_explore
+
+        # remove predicate nodes from paths:
+        paths = [[v for v in p if not v.predicate] for p in paths]
+
+        # make paths unique:
+        paths = [list(x) for x in set(tuple(x) for x in paths)]
+
+        return paths
 
     def graph_to_neo4j(self, uri='bolt://localhost', user='neo4j', password='password'):
         '''
@@ -219,6 +277,43 @@ class Graph(object):
                             session.run(q)
 
         driver.close()
+
+    def graph_to_rdf(self, save_path):
+        '''
+        Converts the graph to an rdf file.
+        :param save_path: path where the rdf file should be saved
+        :return: None
+        '''
+
+        relation_name = 'R'
+
+        g = rdflib.Graph()
+
+        for v in self.vertices:
+            if not v.predicate:
+                s = rdflib.URIRef(v.name)
+                g.add((s, rdflib.URIRef("rdf:type"), rdflib.URIRef("owl:NamedIndividual")))
+
+        for v in self.vertices:
+            if not v.predicate:
+                s = rdflib.URIRef(v.name)
+                for pred in self.get_neighbors(v):
+                    if pred.predicate:
+                        p = rdflib.URIRef(pred.name)
+                        for obj in self.get_neighbors(pred):
+                            if not obj.predicate:
+                                o = rdflib.URIRef(obj.name)
+                                g.add((s, p, o))
+                    elif pred.relation_modified: # for rtm nodes
+                        p = rdflib.URIRef(relation_name)
+                        o = rdflib.URIRef(pred.name)
+                        g.add((s, p, o))
+                    else:
+                        p = rdflib.URIRef(relation_name)
+                        o = rdflib.URIRef(pred.name)
+                        g.add((s, p, o))
+        g.serialize(destination=save_path, format='n3')
+
 
     @staticmethod
     def rdflib_to_graph(rdflib_g, label_predicates=[], relation_tail_merging=False, skip_literals=False,
@@ -475,3 +570,37 @@ class Tree():
                'style': "rounded,filled",
                'shape': 'ellipse' if is_leaf_node else 'box'}
         return out
+
+
+if __name__ == '__main__': # TODO: add this example to the MINDWALC repo?
+
+    # create simple example graph:
+    g = Graph()
+    start_node = Vertex('A')
+    g.add_vertex(start_node)
+    g.add_vertex(Vertex('B', predicate=True))
+    g.add_vertex(Vertex('C', predicate=True))
+    g.add_vertex(Vertex('D'))
+    target_node = Vertex('E')
+    g.add_vertex(target_node)
+    g.add_vertex(Vertex('F', predicate=True))
+    g.add_edge(g.name_to_vertex['A'], g.name_to_vertex['B'])
+    g.add_edge(g.name_to_vertex['A'], g.name_to_vertex['C'])
+    g.add_edge(g.name_to_vertex['A'], g.name_to_vertex['F'])
+    g.add_edge(g.name_to_vertex['B'], g.name_to_vertex['D'])
+    g.add_edge(g.name_to_vertex['B'], g.name_to_vertex['E'])
+    g.add_edge(g.name_to_vertex['C'], g.name_to_vertex['E'])
+
+    # visualize the graph:
+    g.visualise()
+
+    d = 1
+
+    for p in g.extract_paths('A', d):
+        print([v.name for v in p])
+
+    print()
+
+    print(g.extract_neighborhood('A', d).depth_map)
+
+    exit()
