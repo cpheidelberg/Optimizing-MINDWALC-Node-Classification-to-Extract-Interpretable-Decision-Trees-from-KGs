@@ -1,7 +1,7 @@
 from warnings import warn
 import sys, os
 from graph_processing.neo4j2rdf import cypher_to_rdf
-from utils.filesystem import create_new_result_folder_in
+from utils.filesystem import create_new_result_folder_in, make_folder
 import json
 from tqdm import tqdm
 import rdflib
@@ -63,6 +63,8 @@ def main():
     concepts_to_disconnect = subgraph_generation_config['concepts_to_disconnect']
     relations_to_disconnect = subgraph_generation_config['relations_to_disconnect']
     node_types_to_consider = subgraph_generation_config['node_types_to_consider']
+    instance_neighborhood_extraction_size = subgraph_generation_config['instance_neighborhood_extraction_size'] if 'instance_neighborhood_extraction_size' in subgraph_generation_config.keys() else None
+    graph_preprocessing_queries = subgraph_generation_config['graph_preprocessing_queries'] if 'graph_preprocessing_queries' in subgraph_generation_config.keys() else []
 
     ########### random relation removement and graph params ###########
     relation_types_not_allowed_to_delete = subgraph_generation_config['relation_types_not_allowed_to_delete']
@@ -96,6 +98,9 @@ def main():
     relation_tail_merging = subgraph_generation_config['relation_tail_merging']
     mute_node_properties = subgraph_generation_config['mute_node_properties']
 
+    ##### other params #######
+    base_path = subgraph_generation_config['base_path']
+
     ########## Pokemon labeling params #####
     # for tree of life tree:
     label_name_to_getter_query = subgraph_generation_config['label_name_to_getter_query']
@@ -110,12 +115,17 @@ def main():
     driver = GraphDatabase.driver(gdb_adress, auth=auth)
     session = driver.session(database="neo4j")
 
+    if graph_preprocessing_queries:
+        print(f"initializing subgraph generation with config: {subgraph_generation_config}")
+        for query in graph_preprocessing_queries:
+            session.run(query)
+
     #random_relation_removements = [round(x, 2) for x in np.linspace(rrr_start, rrr_max, step_count)]
 
     print(f"random_relation_removements: {random_relation_removements}")
 
-    result_path_root = create_new_result_folder_in('data/RRR_node_clf', overwrite_output_files,
-                                                   f'rrr_curve_{subgraph_name}_')
+    result_path_root = create_new_result_folder_in(base_path, overwrite_output_files,
+                                                   f'{subgraph_name}_')
 
     print(f"saving results to {result_path_root}")
 
@@ -131,18 +141,49 @@ def main():
         session.run(f"match (n) remove n.{subgraph_name}")
         session.run(f"match ()-[r]-() remove r.{subgraph_name}")
 
-        all_node_types = "(n:" + " or n:".join(node_types_to_consider) + ")"
-
-        # select all nodes:
-        for node_type_to_consider in node_types_to_consider:
-            session.run(f"match (n:{node_type_to_consider}) set n.{subgraph_name} = true") # for now, select whole graph as subgraph
-
-        # select all relations between selected nodes:
-        session.run(f"match (a)-[r]-(b) where a.{subgraph_name} and b.{subgraph_name} set r.{subgraph_name} = true")
-
         # select the instances and the instance knowledge:
         for node_type_to_consider in node_types_to_consider:
-            session.run(f"match (n:{node_instance_type})-[r]-(t:{node_type_to_consider}) set n.{subgraph_name} = true, r.{subgraph_name} = true")
+            session.run(
+                f"match (n:{node_instance_type})-[r]-(t:{node_type_to_consider}) set n.{subgraph_name} = true, r.{subgraph_name} = true")
+
+        if not instance_neighborhood_extraction_size: # select subgraph only based on node-types:
+            for node_type_to_consider in node_types_to_consider:
+                session.run(f"match (n:{node_type_to_consider}) set n.{subgraph_name} = true")
+            # select all relations between selected nodes:
+            session.run(
+                    f"match (a)-[r]-(b) where a.{subgraph_name} and b.{subgraph_name} set r.{subgraph_name} = true")
+
+        else: # select the subgraph based on the neighborhood of the instances and allowed node-types:
+            print(f"Adding neighborhood r={instance_neighborhood_extraction_size} to the subgraph...")
+            instance_node_ids = [r["ID(n)"] for r in session.run(f"match (n:{node_instance_type}) return ID(n)")]
+            selected_nodes = set()
+            selected_relations = set()
+            for instance_node_id in instance_node_ids:
+                query = f"MATCH (a:{node_instance_type})-[r*1..{instance_neighborhood_extraction_size}]-(b) " \
+                        f"WHERE ID(a) = {instance_node_id} " \
+                        f"RETURN r"
+                results = [r['r'] for r in session.run(query)]
+                for relations in results:
+                    for relation in relations:
+                        # selected_nodes.add(result["ID(a)"])
+                        selected_nodes.add(relation.start_node.element_id)
+                        selected_nodes.add(relation.end_node.element_id)
+                        selected_relations.add(relation.element_id)
+
+            selected_nodes = list(selected_nodes)
+            selected_relations = list(selected_relations)
+            chunk_size = 100
+            selected_nodes_chunks = [selected_nodes[i:i + chunk_size] for i in range(0, len(selected_nodes), chunk_size)]
+            selected_relations_chunks = [selected_relations[i:i + chunk_size] for i in range(0, len(selected_relations), chunk_size)]
+            for node_ids in selected_nodes_chunks:
+                node_ids = str(node_ids).replace("'", '')
+                allowed_node_types_str = '( ' + ' or '.join([f"n:{t}" for t in node_types_to_consider]) + ' )'
+                session.run(f"match (n) where {allowed_node_types_str} and ID(n) in {node_ids} set n.{subgraph_name} = true")
+            for relation_ids in selected_relations_chunks:
+                relation_ids = str(relation_ids).replace("'", '')
+                session.run(f"match ()-[r]-(b) where ID(r) in {relation_ids} set r.{subgraph_name} = true")
+
+
 
         # remove specific concepts from selection:
         for node_type_to_consider in node_types_to_consider:
@@ -196,6 +237,8 @@ def main():
         session.run(
             f"match (n:{subgraph_name}) where n.subgraph_name = '{subgraph_name}' set n.subgraph_node_size = {subgraph_node_size}")
 
+        print(f"Subgraph {subgraph_name} has {subgraph_node_size} nodes.")
+
         ########### load and assemble train data from graph database ############
         train_data = {'node_id': [], 'label': []}
         if label_name_to_getter_query:
@@ -218,13 +261,14 @@ def main():
                                                        f'RRR_{random_relation_removement}')
 
         ##### save train_data.csv
-        train_data_path = f'{result_path_RRR}/train_set_{round(random_relation_removement,2)}.csv'
+        train_data_path = f'{result_path_RRR}/dataset{round(random_relation_removement,2)}.csv'
         if len(list(set(train_data['node_id']))) != len(train_data['node_id']):
             print(f'WARNING: some reports appear more than once in test set!')
         df = pd.DataFrame(train_data)
         df.to_csv(train_data_path)
 
         ###### convert subgraph to rdf file, save it and load it as Graph object: #####
+        print(f"converting selected subgraph to rdf file...")
         addr = gdb_adress.replace(':7687', '').replace('bolt://', '')
         rdf_subgraph_file = f'{result_path_RRR}/subgraph.n3'
         report_subgraph_query = f'match (a)-[r]->(b) where a.{subgraph_name} and b.{subgraph_name} and r.{subgraph_name} return *'
@@ -235,6 +279,17 @@ def main():
                                            skip_literals=mute_node_properties, skip_nodes_with_prefix=skip_nodes_with_prefix)
         kg_rtm = Graph.rdflib_to_graph(g, relation_tail_merging=True, label_predicates=rdf_predicates_to_filter_out,
                                        skip_literals=mute_node_properties, skip_nodes_with_prefix=skip_nodes_with_prefix)
+
+        # store kg_rtm and kg_non_rtm as .gv files as pickled objects:
+        '''import pickle
+        with open(f'{result_path_RRR}/kg_rtm.pkl', 'wb') as f:
+            pickle.dump(kg_rtm, f)
+        with open(f'{result_path_RRR}/kg_non_rtm.pkl', 'wb') as f:
+            pickle.dump(kg_non_rtm, f)
+        print(f"storing rtm graph")
+        kg_rtm.graph_to_rdf(f'{result_path_RRR}/subgraph_rtm.n3')
+        print(f"storing input-graph")
+        kg_non_rtm.graph_to_rdf(f'{result_path_RRR}/subgraph_non_rtm.n3')'''
 
         # create and clean training data: Remove each report which does not appear in our graph:
         traintest_ents = []
@@ -281,7 +336,7 @@ def main():
             for node in label_to_node_list[label]:
                 meta_info += f'{node}\n'
             meta_info += '\n'
-        with open(f'{result_path_RRR}/train_set_info.txt', 'w') as f:
+        with open(f'{result_path_RRR}/dataset_info.txt', 'w') as f:
             f.write(meta_info)
 
         # generate cross validation dataset:
@@ -292,7 +347,7 @@ def main():
         else:
             cross_val_data_set = [(pd.DataFrame({"feature": traintest_ents, "label": traintest_labels}),
                                    pd.DataFrame({"feature": traintest_ents, "label": traintest_labels}))]
-            print("WARNING: No cross validation performed, because fold_amount is None.")
+            print("WARNING: Cross-validation is disabled. training and testing will be performed on the same data.")
 
         for setting_id in range(len(path_max_depths)): #################### for each setting:
             path_max_depth = path_max_depths[setting_id]
@@ -358,6 +413,7 @@ def main():
 
             average_setting = "weighted"
             os.mkdir(result_path + "/trees")
+            os.mkdir(result_path + "/datasets")
             for i_crossval, (train_dataset, test_dataset) in enumerate(cross_val_data_set):
 
                 if use_sklearn[setting_id]:
@@ -434,6 +490,39 @@ def main():
 
 
                 if store_all_trees or i_crossval == 0:
+
+                    # first, store the dataset split used for cross-val:
+                    sorted_train_data = train_dataset.to_dict()
+                    for label in list(set([label for label in sorted_train_data['label'].values()])):
+                        sorted_train_data[label] = []
+                        for instance_index in sorted_train_data['label'].keys():
+                            if sorted_train_data['label'][instance_index] == label:
+                                rdf_node_id = sorted_train_data['feature'][instance_index].replace(gv_file_prefix, '')
+                                node_names = [r['name'] for r in  session.run(f"match (n) where ID(n) = {rdf_node_id} return n.name as name")]
+                                node_name = node_names[0] if len(node_names) > 0 else sorted_train_data['feature'][instance_index]
+                                node_name = node_name if node_name else sorted_train_data['feature'][instance_index]
+                                sorted_train_data[label].append(node_name)
+                    sorted_train_data.pop('feature')
+                    sorted_train_data.pop('label')
+                    sorted_test_data = test_dataset.to_dict()
+                    for label in list(set([label for label in sorted_test_data['label'].values()])):
+                        sorted_test_data[label] = []
+                        for instance_index in sorted_test_data['label'].keys():
+                            if sorted_test_data['label'][instance_index] == label:
+                                rdf_node_id = sorted_test_data['feature'][instance_index].replace(gv_file_prefix, '')
+                                node_names = [r['name'] for r in session.run(f"match (n) where ID(n) = {rdf_node_id} return n.name as name")]
+                                node_name = node_names[0] if len(node_names) > 0 else sorted_test_data['feature'][instance_index]
+                                node_name = node_name if node_name else sorted_test_data['feature'][instance_index]
+                                sorted_test_data[label].append(node_name)
+                    sorted_test_data.pop('feature')
+                    sorted_test_data.pop('label')
+                    with open(result_path + f"/datasets/split_{i_crossval}.json", 'w') as f:
+                        f.write(json.dumps({
+                            "train": sorted_train_data,
+                            "test": sorted_test_data,
+                        }, indent=4))
+
+                    # now generate the decision tree visualization ans store as pdf
                     if use_sklearn[setting_id]:
                         dot_data = sktree.export_graphviz(clf_sk_tree, out_file=None,
                                                         feature_names=[str(fn) for fn in walk_candidates],
@@ -442,12 +531,12 @@ def main():
                                                         special_characters=True)
                         # Export tree to gv and pdf
                         src = graphviz.sources.Source(dot_data)
-                        src.render(result_path + f"/trees/example_tree{i_crossval}.gv", view=False)
+                        src.render(result_path + f"/trees/decision_tree{i_crossval}.gv", view=False)
 
-                        tree_visualisation_postprocessor(result_path + f"/trees/example_tree{i_crossval}.gv", gdb_adress, auth,
+                        tree_visualisation_postprocessor(result_path + f"/trees/decision_tree{i_crossval}.gv", gdb_adress, auth,
                                                          ["name", "FSN"],
                                                          depth_offset=tree_vis_depth_offset, depth_factor=tree_vis_depth_factor,
-                                                         node_labels_to_hide=node_types_to_consider)
+                                                         node_labels_to_hide=node_types_to_consider, kg=kg)
 
                         cross_val_results["node_count"].append(clf_sk_tree.tree_.node_count)
                         cross_val_results["max_tree_depth"].append(clf_sk_tree.tree_.max_depth)
@@ -463,10 +552,10 @@ def main():
                             data_distribution_in_tree = clf.validate_tree(kg, list(train_dataset['feature']),
                                                                           list(train_dataset['label']))
 
-                        tree.visualise(result_path + f"/trees/example_tree{i_crossval}.gv", False, as_pdf=False)
-                        tree_visualisation_postprocessor(result_path + f"/trees/example_tree{i_crossval}.gv", gdb_adress, auth,
+                        tree.visualise(result_path + f"/trees/decision_tree{i_crossval}.gv", False, as_pdf=False)
+                        tree_visualisation_postprocessor(result_path + f"/trees/decision_tree{i_crossval}.gv", gdb_adress, auth,
                                                          ["name", "FSN"], data_distribution_in_tree=data_distribution_in_tree,
-                                                         depth_offset=tree_vis_depth_offset, depth_factor=tree_vis_depth_factor)
+                                                         depth_offset=tree_vis_depth_offset, depth_factor=tree_vis_depth_factor, kg=kg)
 
                         cross_val_results["node_count"].append(tree.node_count)
                         cross_val_results["max_tree_depth"].append(tree.max_tree_depth)

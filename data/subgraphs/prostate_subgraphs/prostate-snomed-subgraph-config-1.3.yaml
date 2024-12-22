@@ -30,11 +30,11 @@
   # If you do not need this, simply enter "true".
   "path_search_relation_condition": "true",
 
-  "neighborhood_extraction_size": 1, # Does extract/select the neighborhood of the center_nodes. 0 means no neighborhood extraction (then, only the paths between the center nodes will be used to select the subgraph).
+  "neighborhood_extraction_size": 1, # Additionally extract/select the neighborhood of the center_nodes. 0 means no neighborhood extraction (then, only the paths between the center nodes will be used to select the subgraph).
   "search_for_directed_paths": false,
   "subgraph_name": "prostate_subgraph",
   "test_run": false, # test_run true is faster because it does only collect one smallest path for each start-target-node pair. But it does find less paths!
   "export_rdf": true,
   "export_as_neo4j_cypher_import_script": true,
-  "base_label": "ObjectConcept"  # nodes which do not have this label, will not be collected. (currently None not allowed)
+  "base_label": "ObjectConcept"  # nodes which do not have this label, will not be collected.
 }

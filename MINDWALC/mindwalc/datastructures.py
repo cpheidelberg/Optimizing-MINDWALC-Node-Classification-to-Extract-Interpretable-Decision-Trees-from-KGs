@@ -86,21 +86,21 @@ class Graph(object):
         if draw_predicate_nodes_as_edges:
             for v in self.vertices:
                 if not v.predicate:
-                    name = v.name.split('/')[-1]
+                    name = v.name#.split('/')[-1]
                     nx_graph.add_node(name, name=name, pred=v.predicate)
 
             for v in tqdm(self.vertices):
                 if not v.predicate:
-                    v_name = v.name.split('/')[-1]
+                    v_name = v.name#.split('/')[-1]
                     # Neighbors are predicates
                     for pred in self.get_neighbors(v):
-                        pred_name = pred.name.split('/')[-1]
+                        pred_name = pred.name#.split('/')[-1]
                         for obj in self.get_neighbors(pred):
-                            obj_name = obj.name.split('/')[-1]
+                            obj_name = obj.name#.split('/')[-1]
                             nx_graph.add_edge(v_name, obj_name, name=pred_name)
         else:
             for v in self.vertices:
-                name = v.name.split('/')[-1]
+                name = v.name#.split('/')[-1]
                 if v.predicate:
                     name += "\n(P)"
                 elif v.relation_modified:
@@ -108,13 +108,13 @@ class Graph(object):
                 nx_graph.add_node(name, name=name, pred=v.predicate)
 
             for v in tqdm(self.vertices):
-                name_v = v.name.split('/')[-1]
+                name_v = v.name#.split('/')[-1]
                 if v.predicate:
                     name_v += "\n(P)"
                 elif v.relation_modified:
                     name_v += "\n(RTM)"
                 for neighbor in self.get_neighbors(v):
-                    name_b = neighbor.name.split('/')[-1]
+                    name_b = neighbor.name#.split('/')[-1]
                     if neighbor.predicate:
                         name_b += "\n(P)"
                     elif neighbor.relation_modified:
@@ -147,16 +147,16 @@ class Graph(object):
 
         return neighborhood
 
-    def extract_paths(self, instance, depth):
+    def extract_paths(self, instance, max_depth, skip_predicates=False):
 
-        assert depth > 0, "Depth must be greater than 0."
+        assert max_depth > 0, "max-Depth must be greater than 0."
         root = self.name_to_vertex[str(instance)]
         to_explore = {root}
         paths = [[root]]
 
-        print (f"added path: {[n.name for n in paths[0]]} to paths")
+        #print (f"added path: {[n.name for n in paths[0]]} to paths")
 
-        for d in range(depth + 1):
+        for d in range(max_depth + 1):
             new_explore = set()
             pref_paths = [] + paths
             for v in list(to_explore):
@@ -174,7 +174,8 @@ class Graph(object):
             to_explore = new_explore
 
         # remove predicate nodes from paths:
-        paths = [[v for v in p if not v.predicate] for p in paths]
+        if skip_predicates:
+            paths = [[v for v in p if not v.predicate] for p in paths]
 
         # make paths unique:
         paths = [list(x) for x in set(tuple(x) for x in paths)]
@@ -616,7 +617,6 @@ if __name__ == '__main__': # TODO: add this example to the MINDWALC repo?
     fig = g.visualise(draw_predicate_nodes_as_edges=False)
     fig.suptitle('Graph Visualization')
     fig.show()
-
 
     # print the paths in terminal and visualize them as one graph:
     g_paths = Graph()

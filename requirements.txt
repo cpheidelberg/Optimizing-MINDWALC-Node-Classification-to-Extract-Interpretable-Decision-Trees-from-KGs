@@ -16,3 +16,4 @@ scipy
 tqdm
 ipywidgets
 pydot
+pyvis # for custom html graph visualization

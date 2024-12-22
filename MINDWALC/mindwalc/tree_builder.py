@@ -54,6 +54,8 @@ class MINDWALCMixin():
         walks = set()
         for neighborhood in neighborhoods:
             for d in neighborhood.depth_map.keys():
+                if d == 0: # TODO: add this change to the MINDWLAC repo!
+                    continue
                 for vertex in neighborhood.depth_map[d]:
                     if fixed_walc_depth:
                         walks.add((vertex, d))
@@ -92,7 +94,7 @@ class MINDWALCMixin():
 
 
     def _mine_walks(self, neighborhoods, labels, n_walks=1, sample_frac=None,
-                    useless=None, fixed_walc_depth=True):
+                    useless=None, fixed_walc_depth=True): # TODO: PUSH this to MINDWALC repo!
         """Mine the top-`n_walks` walks that have maximal information gain.
         returns walks in shape (vertex, depth) with depth = int, for fixed walk or (int, int) for flexible walk.
         If depth = (int, int, int), this means that the flexible and the fixed walk to this vertex have same info gain."""
@@ -142,22 +144,22 @@ class MINDWALCMixin():
                         max_ig = ig
                         best_depth = depth
                         top_walk = (vertex, depth)
-                    elif ig == max_ig: # if same info gain, use the one with smaller depth:
+                    elif ig == max_ig and ig > 0.0: # if same info gain, use the one with smaller depth:
 
                         # but: depth can be an int (fixed walking depth) or a tuple (flexible walking depth)
                         best_depth_is_fix = type(best_depth) is not tuple
                         depth_is_fix = type(depth) is not tuple
 
-                        if best_depth_is_fix and depth_is_fix:
+                        if best_depth_is_fix and depth_is_fix: # take the shorter walk if both are fixed
                             if depth < best_depth:
                                 max_ig = ig
                                 best_depth = depth
                                 top_walk = (vertex, depth)
-                        elif best_depth_is_fix and not depth_is_fix:
+                        elif best_depth_is_fix and not depth_is_fix: # current depth is flexible but other one is fixed
                             # this tuple of len 3 communicates that the flexible and the fixed walk to this vertex have same info gain
                             best_depth = (depth[0], depth[1], best_depth)
-                            top_walk = (vertex, best_depth)
-                        elif not best_depth_is_fix and depth_is_fix:
+                            top_walk = (top_walk[0] if top_walk else None, best_depth)
+                        elif not best_depth_is_fix and depth_is_fix: # current depth is fixed but other one is flexible
                             # this tuple of len 3 communicates that the flexible and the fixed walk to this vertex have same info gain
                             best_depth = (best_depth[0], best_depth[1], depth)
                             top_walk = (vertex, best_depth)
