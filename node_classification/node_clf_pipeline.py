@@ -2,7 +2,7 @@ import os, sys
 import yaml
 
 
-base_path = 'data/RRR_node_clf/AllIgaAmyReports/google-translated'  # google vs deepL
+base_path = 'data/RRR_node_clf_2/AllIgaAmyReports/deepL-translated'  # google vs deepL
 with_cross_validation = False
 
 configs_to_test = [
@@ -43,7 +43,7 @@ configs_to_test = [
     },
 ]
 
-configs_to_test = [configs_to_test[2]] # retrying crashed job(s)
+#configs_to_test = [configs_to_test[2]] # retrying crashed job(s)
 
 # check if we are at correct working directory:
 workdir = os.getcwd()
@@ -54,6 +54,8 @@ if not workdir[-len('Optimizing-MINDWALC-Node-Classification-to-Extract-Interpre
 
 
 for changes in configs_to_test:
+    changes['dt_label'] = base_path.split('/')[2] + '\\n' + base_path.split('/')[3] + '\\n' + changes['subgraph_name']
+    print(changes['dt_label'])
     configuration = yaml.safe_load(open('node_classification/configs/IgaAmyReports.yaml', 'r'))
     for key, value in changes.items():
         configuration[key] = value

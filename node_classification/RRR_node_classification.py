@@ -466,7 +466,11 @@ def main():
                                            path_min_depth=path_min_depth, n_jobs=n_jobs)
 
                     # train:
-                    clf.fit(kg, list(train_dataset['feature']), list(train_dataset['label']), post_prune=post_prune)
+                    try:
+                        clf.fit(kg, list(train_dataset['feature']), list(train_dataset['label']), post_prune=post_prune)
+                    except Exception as e:
+                        print(f"Error while training tree: {e}")
+                        continue
 
                     # predict:
                     preds = clf.predict(kg, test_dataset['feature'])

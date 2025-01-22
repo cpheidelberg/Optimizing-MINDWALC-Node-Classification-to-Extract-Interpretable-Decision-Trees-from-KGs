@@ -62,6 +62,7 @@
   # for decision tree visualization:
   tree_vis_depth_offset: 0, #
   tree_vis_depth_factor: 1.0, #0.5 can make sence if RTM is not used (then, relation-count is subtracted)
+  dt_label: 'SnomedDiagnoseDisorder', # the label of the ploted decision tree
 
   ############ mindwalc params: ###########
   # default is 8. (4 would mean: do not use background knowledge, 6=maximum +1 step into knowledge, 8=+2 steps into knowledge...)

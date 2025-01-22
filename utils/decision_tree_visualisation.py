@@ -182,6 +182,9 @@ def tree_visualisation_postprocessor(in_gv_file_path, neo4j_url="neo4j://localho
     skip_predicates_during_path_collection = False
 
     subgraph_name = config["subgraph_name"]
+    dt_label = config["dt_label"] if "dt_label" in config else ""
+    tree_config_string = in_gv_file_path.split("/")[-3]
+    dt_label += new_line_symbol + tree_config_string
     instance_type = "Report"
     if "_RTM" in in_gv_file_path.split("trees")[0]:
         path_to_kg = in_gv_file_path.split("trees")[0] + ".." + "/kg_rtm.pkl"
@@ -465,12 +468,17 @@ def tree_visualisation_postprocessor(in_gv_file_path, neo4j_url="neo4j://localho
         for k in decision_node.keys():
             g.nodes[gv_target_node_id][k] = decision_node[k]
 
+    # add a label for the whole graph:
+    g.label = f"{out_gv_file_path}"
+
     # save g as .gv file:
     gv_code_string = None
     try:
         nx.nx_pydot.write_dot(g, out_gv_file_path)
         with open(out_gv_file_path, 'r') as f:
             gv_code_string = f.read()
+        # add the graph label to the gv_code_string:
+        gv_code_string = gv_code_string.replace('digraph "DT" {\nlabel="";', 'digraph "DT" {\nlabel="'+dt_label+'";')
         from graphviz import Source
         src = Source(gv_code_string)
         src.render(out_gv_file_path, view=False)
