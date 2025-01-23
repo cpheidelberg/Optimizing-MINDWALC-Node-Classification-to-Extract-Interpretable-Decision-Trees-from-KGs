@@ -2,10 +2,15 @@ import os, sys
 import yaml
 
 
-base_path = 'data/RRR_node_clf_2/AllIgaAmyReports/deepL-translated'  # google vs deepL
+#base_path = 'data/RRR_node_clf_2/20IgaAmyReports/deepL-translated'
+base_path = 'data/KBC_DTs_1/AllIgaAmyReports/deepL-translated'
+
+base_config_file = 'node_classification/configs/IgaAmyReports.yaml'
+
 with_cross_validation = False
 
-configs_to_test = [
+# for SNOMED tests:
+'''configs_to_test = [
     {
         'subgraph_name': 'SnomedDiagnoseDisorder',
         'relations_to_disconnect': ['EXISTENCE_IN_CLINICINFO', 'EXISTENCE_IN_SAMPLEINFO', 'EXISTENCE_IN_DESCRIPTION'], # 'EXISTENCE_IN_CLINICINFO', 'EXISTENCE_IN_SAMPLEINFO', 'EXISTENCE_IN_DESCRIPTION', 'EXISTENCE_IN_DIAGNOSE'
@@ -41,6 +46,24 @@ configs_to_test = [
         'base_path': base_path,
         'fold_amount': 10 if with_cross_validation else None
     },
+]'''
+
+# for KBC:
+configs_to_test = [
+    {
+        'subgraph_name': 'KBCDiagnoseObjectConcept',
+        'relations_to_disconnect': ['EXISTENCE_IN_CLINICINFO', 'EXISTENCE_IN_SAMPLEINFO', 'EXISTENCE_IN_DESCRIPTION'], # 'EXISTENCE_IN_CLINICINFO', 'EXISTENCE_IN_SAMPLEINFO', 'EXISTENCE_IN_DESCRIPTION', 'EXISTENCE_IN_DIAGNOSE'
+        'node_types_to_consider': ['Context', 'ObjectConcept'], # 'ObjectConcept', 'MorphologicAbnormality', 'ObservableEntity', 'Finding', 'Disorder', 'Procedure', 'Cell'
+        'base_path': base_path,
+        'fold_amount': 10 if with_cross_validation else None
+    },
+    {
+        'subgraph_name': 'KBCDescriptionObjectConcept',
+        'relations_to_disconnect': ['EXISTENCE_IN_CLINICINFO', 'EXISTENCE_IN_SAMPLEINFO', 'EXISTENCE_IN_DIAGNOSE'], # 'EXISTENCE_IN_CLINICINFO', 'EXISTENCE_IN_SAMPLEINFO', 'EXISTENCE_IN_DESCRIPTION', 'EXISTENCE_IN_DIAGNOSE'
+        'node_types_to_consider': ['Context', 'ObjectConcept'], # 'ObjectConcept', 'MorphologicAbnormality', 'ObservableEntity', 'Finding', 'Disorder', 'Procedure', 'Cell'
+        'base_path': base_path,
+        'fold_amount': 10 if with_cross_validation else None
+    }
 ]
 
 #configs_to_test = [configs_to_test[2]] # retrying crashed job(s)
@@ -56,7 +79,7 @@ if not workdir[-len('Optimizing-MINDWALC-Node-Classification-to-Extract-Interpre
 for changes in configs_to_test:
     changes['dt_label'] = base_path.split('/')[2] + '\\n' + base_path.split('/')[3] + '\\n' + changes['subgraph_name']
     print(changes['dt_label'])
-    configuration = yaml.safe_load(open('node_classification/configs/IgaAmyReports.yaml', 'r'))
+    configuration = yaml.safe_load(open(base_config_file, 'r'))
     for key, value in changes.items():
         configuration[key] = value
 

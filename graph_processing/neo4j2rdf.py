@@ -35,7 +35,7 @@ def cypher_to_rdf(cypher, save_path, addr, auth, format='text/n3'):
         f.close()
         # print(f"saved at {save_path}")
     else:
-        raise Exception(f'cypher_to_rdf FAILED with {resp.status_code}. Did you configure neo4h correctly?\n'
+        raise Exception(f'cypher_to_rdf FAILED with {resp.status_code}. Did you configure neo4j correctly?\n'
                         'This are the required configs:\n'
                         '- neo4j database with neosemantics plugin installed\n'
                         '- in neo4j.conf: server.unmanaged_extension_classes=n10s.endpoint=/rdf (newer neo4j versions) '
