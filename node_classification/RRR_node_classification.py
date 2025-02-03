@@ -45,6 +45,8 @@ def get_splits_for_cross_val(features, labels, fold_amount=10, stratified=True):
         for train_index_list, test_index_list in folds.split(list(range(len(dataset)))):
             yield dataset.iloc[train_index_list], dataset.iloc[test_index_list]
 
+
+
 ############# main ####################
 def main():
     # load config file with yaml:
@@ -119,6 +121,18 @@ def main():
         print(f"initializing subgraph generation with config: {subgraph_generation_config}")
         for query in graph_preprocessing_queries:
             session.run(query)
+
+    def get_names_of_neo4jrdf_node_ids(entity_list):
+        print(f"entity_list: {entity_list}")
+        neo4j_node_ids = [entity_string.replace(gv_file_prefix, '') for entity_string in entity_list]
+        assert len(list(set(neo4j_node_ids))) == len(neo4j_node_ids), "ERROR: duplicate node ids in entity_list!"
+        q = f"match (n) where ID(n) in {neo4j_node_ids} return n.name as name".replace("'", '')
+        print(f"q: {q}")
+        names = [r['name'] for r in session.run(q)]
+        if len(names) != len(entity_list) or len(names) == 0:
+            raise ValueError(f"Could only find {len(names)} names for all {len(entity_list)} entities with ids: {entity_list}")
+        return names
+
 
     #random_relation_removements = [round(x, 2) for x in np.linspace(rrr_start, rrr_max, step_count)]
 
@@ -306,6 +320,8 @@ def main():
                   f"because they do not appear in the knowledge graph '{rdf_subgraph_file}'.")
             print(f"List of sorted out ents: {ents_sorted_out}")
 
+
+
         if len(traintest_ents) == 0:
             warn(f"ERROR: Could not find any training data points in the knowledge graph '{rdf_subgraph_file}' "
                  f"using querie:\n{label_name_to_getter_query}")
@@ -333,9 +349,13 @@ def main():
         meta_info += "\n"
         for label in alphabet_labels:
             meta_info += f'Reports labeled with "{label}":\n'
-            for node in label_to_node_list[label]:
+            for node in get_names_of_neo4jrdf_node_ids(label_to_node_list[label]):
                 meta_info += f'{node}\n'
             meta_info += '\n'
+        meta_info += '\n'
+        meta_info += f"{len(ents_sorted_out)} instances have been sorted out due to missing connections to given (knowledge-)graph:\n"
+        for ent in get_names_of_neo4jrdf_node_ids(ents_sorted_out):
+            meta_info += f"{ent}\n"
         with open(f'{result_path_RRR}/dataset_info.txt', 'w') as f:
             f.write(meta_info)
 
