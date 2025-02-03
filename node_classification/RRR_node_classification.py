@@ -123,11 +123,9 @@ def main():
             session.run(query)
 
     def get_names_of_neo4jrdf_node_ids(entity_list):
-        print(f"entity_list: {entity_list}")
         neo4j_node_ids = [entity_string.replace(gv_file_prefix, '') for entity_string in entity_list]
         assert len(list(set(neo4j_node_ids))) == len(neo4j_node_ids), "ERROR: duplicate node ids in entity_list!"
         q = f"match (n) where ID(n) in {neo4j_node_ids} return n.name as name".replace("'", '')
-        print(f"q: {q}")
         names = [r['name'] for r in session.run(q)]
         if len(names) != len(entity_list) or len(names) == 0:
             raise ValueError(f"Could only find {len(names)} names for all {len(entity_list)} entities with ids: {entity_list}")
