@@ -123,6 +123,8 @@ def main():
             session.run(query)
 
     def get_names_of_neo4jrdf_node_ids(entity_list):
+        if not entity_list:
+            return []
         neo4j_node_ids = [entity_string.replace(gv_file_prefix, '') for entity_string in entity_list]
         assert len(list(set(neo4j_node_ids))) == len(neo4j_node_ids), "ERROR: duplicate node ids in entity_list!"
         q = f"match (n) where ID(n) in {neo4j_node_ids} return n.name as name".replace("'", '')
@@ -243,7 +245,7 @@ def main():
 
         # adding subgraph size to subgraph metha:
         r = session.run(f"match (c) where c.{subgraph_name} return count(c) as amount")
-        subgraph_node_size = [a['amount'] for a in r]
+        subgraph_node_size = [a['amount'] for a in r][0]
         if subgraph_node_size == 0:
             warn(f"Subgraph {subgraph_name} has node-size 0!")
         session.run(
@@ -350,10 +352,12 @@ def main():
             for node in get_names_of_neo4jrdf_node_ids(label_to_node_list[label]):
                 meta_info += f'{node}\n'
             meta_info += '\n'
-        meta_info += '\n'
-        meta_info += f"{len(ents_sorted_out)} instances have been sorted out due to missing connections to given (knowledge-)graph:\n"
-        for ent in get_names_of_neo4jrdf_node_ids(ents_sorted_out):
-            meta_info += f"{ent}\n"
+        if ents_sorted_out:
+            meta_info += '\n'
+            meta_info += f"{len(ents_sorted_out)} instances have been sorted out due to missing connections to given (knowledge-)graph:\n"
+            for ent in get_names_of_neo4jrdf_node_ids(ents_sorted_out):
+                meta_info += f"{ent}\n"
+
         with open(f'{result_path_RRR}/dataset_info.txt', 'w') as f:
             f.write(meta_info)
 
@@ -432,6 +436,8 @@ def main():
             average_setting = "weighted"
             os.mkdir(result_path + "/trees")
             os.mkdir(result_path + "/datasets")
+
+            print(f"=> Starting training for setting: {tree_config_string}")
             for i_crossval, (train_dataset, test_dataset) in enumerate(cross_val_data_set):
 
                 if use_sklearn[setting_id]:
@@ -484,11 +490,7 @@ def main():
                                            path_min_depth=path_min_depth, n_jobs=n_jobs)
 
                     # train:
-                    try:
-                        clf.fit(kg, list(train_dataset['feature']), list(train_dataset['label']), post_prune=post_prune)
-                    except Exception as e:
-                        print(f"Error while training tree: {e}")
-                        continue
+                    clf.fit(kg, list(train_dataset['feature']), list(train_dataset['label']), post_prune=post_prune)
 
                     # predict:
                     preds = clf.predict(kg, test_dataset['feature'])
@@ -609,7 +611,9 @@ def main():
             mean_values[tree_config_string]["node_count"].append(len(kg.vertices))
             mean_values[tree_config_string]["relation_count"].append(sum([len(x) for x in kg.transition_matrix.values()]))
 
-            print(f"{tree_config_string}\tf1: {mean_values[tree_config_string]['f1_mean'][-1]} +- {mean_values[tree_config_string]['f1_std'][-1]}", flush=True)
+            print(f"Cross-val results of configuration {tree_config_string}\tf1: "
+                  f"{mean_values[tree_config_string]['f1_mean'][-1]} "
+                  f"+- {mean_values[tree_config_string]['f1_std'][-1]}", flush=True)
 
             # save data as excel table:
             df = pd.DataFrame(cross_val_results)

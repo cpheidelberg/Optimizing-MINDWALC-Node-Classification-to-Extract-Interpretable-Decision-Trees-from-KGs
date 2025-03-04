@@ -155,16 +155,17 @@ class MINDWALCMixin():
                                 max_ig = ig
                                 best_depth = depth
                                 top_walk = (vertex, depth)
-                        elif best_depth_is_fix and not depth_is_fix: # current depth is flexible but other one is fixed
-                            # this tuple of len 3 communicates that the flexible and the fixed walk to this vertex have same info gain
-                            best_depth = (depth[0], depth[1], best_depth)
-                            top_walk = (top_walk[0] if top_walk else None, best_depth)
-                        elif not best_depth_is_fix and depth_is_fix: # current depth is fixed but other one is flexible
-                            # this tuple of len 3 communicates that the flexible and the fixed walk to this vertex have same info gain
-                            best_depth = (best_depth[0], best_depth[1], depth)
-                            top_walk = (vertex, best_depth)
-                        else: # both are flexible
-                            pass
+                        elif vertex == top_walk[0]:
+                            if best_depth_is_fix and not depth_is_fix: # current depth is flexible but other one is fixed
+                                # this tuple of len 3 communicates that the flexible and the fixed walk to this vertex have same info gain
+                                best_depth = (depth[0], depth[1], best_depth)
+                                top_walk = (vertex, best_depth)
+                            if best_depth_is_fix and depth_is_fix: # current depth is fixed but other one is flexible
+                                # this tuple of len 3 communicates that the flexible and the fixed walk to this vertex have same info gain
+                                best_depth = (best_depth[0], best_depth[1], depth)
+                                top_walk = (vertex, best_depth)
+                        else: # one flexible walk, one fixed walk, different target-vertex
+                            pass # lets keep the walk collected before...
 
         if n_walks > 1:
             return top_walks.data
@@ -210,19 +211,17 @@ class MINDWALCTree(BaseEstimator, ClassifierMixin, MINDWALCMixin):
 
     def _build_tree(self, neighborhoods, labels, curr_tree_depth=0, 
                     vertex_sample=None, useless=None):
-
+        assert len(neighborhoods) == len(labels) and len(neighborhoods) > 0
         majority_class = Counter(labels).most_common(1)[0][0]
         if self._stop_condition(neighborhoods, labels, curr_tree_depth):
             return ds.Tree(walk=None, _class=majority_class)
-
         walks = self._mine_walks(neighborhoods, labels, 
                                  sample_frac=vertex_sample, 
                                  useless=useless, fixed_walc_depth=self.fixed_walc_depth)
-
         if len(walks) == 0 or walks[0][0] == 0:
             return ds.Tree(walk=None, _class=majority_class)
 
-        _, best_walk = walks[0]
+        best_ig, best_walk = walks[0]
         best_vertex, best_depth = best_walk
 
         node = ds.Tree(walk=best_walk, _class=None)
@@ -237,7 +236,7 @@ class MINDWALCTree(BaseEstimator, ClassifierMixin, MINDWALCMixin):
             else:
                 not_found_neighborhoods.append(neighborhood)
                 not_found_labels.append(label)
-            
+
         node.right = self._build_tree(found_neighborhoods, found_labels, 
                                       curr_tree_depth=curr_tree_depth + 1,
                                       vertex_sample=vertex_sample,
